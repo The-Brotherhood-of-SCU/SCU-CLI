@@ -6,7 +6,7 @@
 
 ## 特性
 
-- **统一认证**：SM2 加密密码登录、验证码、token 持久化、1 小时 TTL 自动续期
+- **统一认证**：SM2 加密密码登录、**内置本地 OCR 识别验证码**（零网络推理）、token 持久化、1 小时 TTL 自动续期
 - **子系统 SSO 自动建立**：教务 JWT SSO、微服务 CAS 重定向链、缴费/体测 SSO 中继、第二课堂 OAuth
 - **会话过期自愈**：识别各后端过期信号，自动重新认证并重放业务请求一次
 - **机器可读输出**：所有命令输出统一 JSON 包层到 stdout，诊断信息走 stderr
@@ -49,25 +49,29 @@ go build -o scu ./cmd/scu
 
 ## 登录
 
-### 交互式登录
+### 交互式登录（默认本地 OCR 识别验证码）
 
 ```bash
 scu login
-# 提示输入学号、密码（不回显），验证码图片保存到配置目录 captcha.png 并提示识别
+# 提示输入学号、密码（不回显），验证码由内置本地 OCR 自动识别
+# OCR 置信度不足时自动保存图片到配置目录 captcha.png 并提示人工识别
+# --no-ocr 可强制人工识别
 ```
 
-### AI 两步登录（推荐 AI 使用）
+OCR 为纯本地推理（质心模板匹配，算法与权重移植自同组织的浏览器扩展 [scu-plus](https://github.com/The-Brotherhood-of-SCU/scu-plus)，GPL-3.0），无任何网络请求。服务端返回 `invalid_captcha` 时自动换新验证码重试（最多 5 次），与 App 行为一致。
+
+### AI 两步登录
 
 ```bash
-# 第一步：获取验证码（图片路径与 code 以 JSON 返回）
-scu captcha
-# => {"ok":true,"data":{"captcha_code":"...","image_path":".../captcha.png",...}}
+# 第一步：获取验证码（--solve 直接给出本地 OCR 结果）
+scu captcha --solve
+# => {"ok":true,"data":{"captcha_code":"...","captcha_text":"afuc","image_path":".../captcha.png",...}}
 
-# 第二步：识别图片文本后登录
-scu login -u 2023xxxxxx --captcha-code <code> --captcha-text <验证码文本>
+# 第二步：提交登录
+scu login -u 2023xxxxxx --captcha-code <code> --captcha-text <文本>
 ```
 
-密码建议交互输入而非命令行传递（避免进入 shell 历史）。登录成功后保存账号密码用于会话过期自动重新登录（此时若 token 彻底失效仍需验证码，命令会提示重新 login）。
+密码建议交互输入而非命令行传递（避免进入 shell 历史）。登录成功后保存账号密码用于会话过期自动重新登录（同样走本地 OCR，全自动）。
 
 ### 其他认证命令
 
@@ -191,6 +195,7 @@ internal/
   cli/              cobra 命令定义
   auth/             认证：CookieClient、ScuAuth、子系统 Auth、SM2
   api/              业务 API：zhjw / wfw / payapp / fitness / ccyl
+  ocr/              验证码本地 OCR（质心模板匹配，权重移植自 scu-plus）
   config/           凭据持久化（0600）
   output/           统一 JSON 输出包层
 ```
@@ -201,3 +206,7 @@ internal/
 - [resty](https://github.com/go-resty/resty) — HTTP 客户端
 - [emmansun/gmsm](https://github.com/emmansun/gmsm) — SM2 国密加密
 - golang.org/x/term — 密码不回显输入
+
+## 许可证
+
+[AGPL-3.0](LICENSE)。本项目协议层移植自 Bugaoshan（AGPL-3.0），OCR 算法与权重移植自 scu-plus（GPL-3.0）。
