@@ -60,20 +60,20 @@ scu login
 
 OCR 为纯本地推理（质心模板匹配，算法与权重移植自同组织的浏览器扩展 [scu-plus](https://github.com/The-Brotherhood-of-SCU/scu-plus)，GPL-3.0），无任何网络请求。服务端返回 `invalid_captcha` 时自动换新验证码重试（最多 5 次），与 App 行为一致。
 
-### AI 两步登录
-
-所有交互式输入（学号、密码、人工验证码）**仅在 stdin 是交互终端时才会发起**；在非 TTY 环境（AI 通过 bash 调用）下会立即报错退出，绝不阻塞。AI 请使用参数化的非交互流程：
+### AI / 非交互登录
 
 ```bash
-# 第一步：获取验证码（--solve 直接给出本地 OCR 结果）
-scu captcha --solve
-# => {"ok":true,"data":{"captcha_code":"...","captcha_text":"afuc","image_path":".../captcha.png",...}}
-
-# 第二步：提交登录
-scu login -u 2023xxxxxx --captcha-code <code> --captcha-text <文本>
+scu login -u 2023xxxxxx -p '密码'
+# 验证码由内置本地 OCR 自动识别；服务端返回 invalid_captcha 时自动换新重试（最多 5 次）
 ```
 
-密码建议交互输入而非命令行传递（避免进入 shell 历史）。登录成功后保存账号密码用于会话过期自动重新登录（同样走本地 OCR，全自动）。
+所有交互式输入（学号、密码、人工验证码）**仅在 stdin 是交互终端时才会发起**；在非 TTY 环境（AI 通过 bash 调用）下会立即报错退出，绝不阻塞。
+
+> 注意：`-p` 会进入 shell 历史和进程列表，人机使用时建议省略 `-p` 走交互输入。
+
+OCR 为纯本地推理（质心模板匹配，算法与权重移植自同组织的浏览器扩展 [scu-plus](https://github.com/The-Brotherhood-of-SCU/scu-plus)，GPL-3.0），无任何网络请求。登录成功后保存账号密码用于会话过期自动重新登录（同样走本地 OCR，全自动）。
+
+OCR 连续失败时的备用手段：`scu captcha --solve` 可单独取验证码（输出 `captcha_code` + 图片路径 + OCR 结果），再配合 `scu login -u <学号> --captcha-code <code> --captcha-text <文本>` 提交。
 
 ### 其他认证命令
 

@@ -15,8 +15,7 @@ import (
 // 面向 AI/脚本调用：任何交互 prompt 在非 TTY 环境下必须立即失败，
 // 绝不能阻塞等待输入（AI 执行 bash 时会被挂住）。
 var ErrNonInteractive = errors.New("需要交互输入，但 stdin 不是交互终端。" +
-	"请改用非交互方式：scu captcha --solve 获取验证码，然后 " +
-	"scu login -u <学号> -p <密码> --captcha-code <code> --captcha-text <文本>")
+	"请改用非交互方式：scu login -u <学号> -p <密码>（验证码由内置 OCR 自动识别）")
 
 // stdinIsTerminal 报告 stdin 是否为交互终端。
 func stdinIsTerminal() bool {
