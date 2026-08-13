@@ -16,7 +16,7 @@
 ### npm 一键安装（推荐，面向 AI）
 
 ```bash
-npm install -g scu-cli   # 需要 Node.js ≥ 18
+npm install -g @the-brotherhood-of-scu/scu-cli   # 需要 Node.js ≥ 18
 ```
 
 一条命令完成两件事：
@@ -61,7 +61,7 @@ go install github.com/The-Brotherhood-of-SCU/SCU-CLI/cmd/scu@latest
 **一键安装（推荐）**：
 
 ```bash
-npm install -g scu-cli
+npm install -g @the-brotherhood-of-scu/scu-cli
 ```
 
 CLI 与 Skill 一次装好，之后 agent 会话中直接说"帮我查下学期的课表"即可。首次使用 agent 会按 skill 指引执行 `scu login -u <学号> -p <密码>`（验证码内置 OCR 自动识别），之后的会话续期全自动。

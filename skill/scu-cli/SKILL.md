@@ -14,7 +14,7 @@ description: 使用 scu CLI 操作四川大学校园服务（教务课表/成绩
 **方式 A — npm（首选，一条命令）**：
 
 ```bash
-npm install -g scu-cli
+npm install -g @the-brotherhood-of-scu/scu-cli
 ```
 
 需要 Node.js ≥ 18。自动按平台/架构（linux / darwin / windows × amd64 / arm64）下载二进制（SHA256 校验），并把本 Skill 安装到 `~/.claude/skills/scu-cli/`（用户设 `SCU_CLI_NO_SKILL=1` 时会跳过）。

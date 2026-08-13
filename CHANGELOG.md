@@ -8,7 +8,7 @@
 
 ### 新增
 
-- npm 分发：`npm install -g scu-cli` 一键安装——按平台/架构自动从 GitHub Release 下载二进制（SHA256 校验），并自动把 Claude Code Skill 安装到 `~/.claude/skills/scu-cli/`（`SCU_CLI_NO_SKILL=1` 跳过）；标签推送时 CI 在 Release 完成后同步发布到 npm
+- npm 分发：`npm install -g @the-brotherhood-of-scu/scu-cli` 一键安装——按平台/架构自动从 GitHub Release 下载二进制（SHA256 校验），并自动把 Claude Code Skill 安装到 `~/.claude/skills/scu-cli/`（`SCU_CLI_NO_SKILL=1` 跳过）；标签推送时 CI 在 Release 完成后通过 OIDC Trusted Publishing 同步发布到 npm
 
 ## [0.1.0] - 2026-08-13
 
