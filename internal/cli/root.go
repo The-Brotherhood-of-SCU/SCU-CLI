@@ -30,7 +30,7 @@ func Execute() error {
 }
 
 func init() {
-	rootCmd.AddCommand(loginCmd, logoutCmd, whoamiCmd)
+	rootCmd.AddCommand(loginCmd, logoutCmd, whoamiCmd, captchaCmd)
 	rootCmd.AddCommand(zhjwCmd)
 	rootCmd.AddCommand(userCmd)
 	rootCmd.AddCommand(balanceCmd)
