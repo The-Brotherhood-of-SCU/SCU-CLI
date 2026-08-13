@@ -169,7 +169,7 @@ func (a *ScuAuth) Login(username, password, captchaCode, captchaText string) err
 		return &LoginError{Msg: fmt.Sprintf("登录请求失败: %v", err)}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return &LoginError{Msg: fmt.Sprintf("登录请求失败(HTTP %d)", resp.StatusCode)}
+		return &LoginError{Msg: fmt.Sprintf("登录请求失败(HTTP %d): %s", resp.StatusCode, truncate(string(resp.Body), 200))}
 	}
 	var result struct {
 		Success bool   `json:"success"`
@@ -348,3 +348,11 @@ func (a *ScuAuth) Logout() error {
 
 // bytesReader 包装字节切片为 io.Reader。
 func bytesReader(b []byte) io.Reader { return bytes.NewReader(b) }
+
+// truncate 截断字符串用于错误信息。
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "..."
+}

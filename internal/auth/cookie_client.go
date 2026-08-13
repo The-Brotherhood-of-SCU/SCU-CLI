@@ -82,21 +82,26 @@ func (c *CookieClient) SetCookies(u *url.URL, cookies []*http.Cookie) {
 
 // Do 执行单次请求，不跟随重定向。传输层错误时重建底层 client 并重试一次。
 func (c *CookieClient) Do(method, rawURL string, headers map[string]string, body io.Reader) (*Response, error) {
-	resp, err := c.doOnce(method, rawURL, headers, body)
+	var buf []byte
+	if body != nil {
+		var err error
+		buf, err = io.ReadAll(body)
+		if err != nil {
+			return nil, err
+		}
+	}
+	resp, err := c.doOnce(method, rawURL, headers, buf)
 	if err != nil {
 		// 传输层恢复：重建底层 client 后重发一次，第二次失败直接上抛。
 		c.mu.Lock()
 		c.rc = c.newRestyClient()
 		c.mu.Unlock()
-		if rb, ok := body.(interface{ Reset() }); ok {
-			rb.Reset()
-		}
-		resp, err = c.doOnce(method, rawURL, headers, body)
+		resp, err = c.doOnce(method, rawURL, headers, buf)
 	}
 	return resp, err
 }
 
-func (c *CookieClient) doOnce(method, rawURL string, headers map[string]string, body io.Reader) (*Response, error) {
+func (c *CookieClient) doOnce(method, rawURL string, headers map[string]string, body []byte) (*Response, error) {
 	c.mu.Lock()
 	rc := c.rc
 	c.mu.Unlock()
@@ -106,7 +111,10 @@ func (c *CookieClient) doOnce(method, rawURL string, headers map[string]string, 
 		req.SetHeader(k, v)
 	}
 	if body != nil {
+		// 传字节切片让底层带上 Content-Length；
+		// io.Reader 会导致 chunked 编码，部分服务端会 400。
 		req.SetBody(body)
+		req.SetContentLength(true)
 	}
 	// resty 对 NoRedirectPolicy 返回的 3xx 不视为错误。
 	restyResp, err := req.Execute(method, rawURL)
