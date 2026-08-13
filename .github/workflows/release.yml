@@ -4,8 +4,10 @@ name: Release
 #   1. 跨平台构建 CLI 二进制（raw binary + checksums.txt）
 #   2. 打包 skill/ 目录为 scu-cli-skill.zip（内含 scu-cli/SKILL.md）
 #   3. 从 CHANGELOG.md 提取对应版本的章节作为 Release 说明
-#   4. 发布到 npm（postinstall 会从上面的 Release 下载二进制，所以必须在 Release 之后；
-#      需在仓库 secrets 配置 NPM_TOKEN —— npm Automation token）
+#   4. 通过 OIDC Trusted Publishing 发布到 npm（无长期 token；postinstall 会从上面的
+#      Release 下载二进制，所以必须在 Release 之后）
+#      前提：npmjs.com 包设置页配置 Trusted Publisher =
+#      The-Brotherhood-of-SCU / SCU-CLI / release.yml
 on:
   push:
     tags:
@@ -71,22 +73,25 @@ jobs:
             dist/scu-*
             dist/checksums.txt
 
-  # npm 包的 postinstall 从 GitHub Release 下载二进制，故必须等 release job 完成
+  # npm 包的 postinstall 从 GitHub Release 下载二进制，故必须等 release job 完成。
+  # 发布认证走 OIDC Trusted Publishing（npm CLI ≥ 11.5.1，无需 NPM_TOKEN），
+  # 并自动生成 provenance 证明。
   npm:
     needs: release
     runs-on: ubuntu-latest
+    permissions:
+      contents: read # checkout
+      id-token: write # OIDC
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-          registry-url: https://registry.npmjs.org
+          # trusted publishing 要求 npm ≥ 11.5.1；Node 22 自带 npm 10，Node 24 自带 npm 11
+          node-version: 24
 
       - name: Stamp version from tag
         run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
 
       - name: Publish to npm
         run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
