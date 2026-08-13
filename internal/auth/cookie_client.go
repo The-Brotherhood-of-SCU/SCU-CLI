@@ -64,7 +64,14 @@ func (c *CookieClient) newRestyClient() *resty.Client {
 	rc.SetCookieJar(c.jar)
 	rc.SetHeader("User-Agent", DefaultUserAgent)
 	// 禁用自动重定向，改为手动逐跳跟随。
-	rc.SetRedirectPolicy(resty.NoRedirectPolicy())
+	// 必须返回 http.ErrUseLastResponse 哨兵：net/http 收到它会把 3xx
+	// 作为正常响应返回（err == nil），由上层读 Location 继续跟随。
+	// 不能用 resty.NoRedirectPolicy()——它返回 ErrAutoRedirectDisabled，
+	// net/http 会把任何 3xx 包装成 *url.Error 上抛（错误里的 URL 还会
+	// 被替换成原始 Location 字符串），手动重定向链将无法工作。
+	rc.SetRedirectPolicy(resty.RedirectPolicyFunc(func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
+	}))
 	return rc
 }
 
@@ -116,7 +123,8 @@ func (c *CookieClient) doOnce(method, rawURL string, headers map[string]string, 
 		req.SetBody(body)
 		req.SetContentLength(true)
 	}
-	// resty 对 NoRedirectPolicy 返回的 3xx 不视为错误。
+	// 重定向策略返回 ErrUseLastResponse，3xx 会作为正常响应返回，
+	// 由 FollowRedirects 逐跳处理。
 	restyResp, err := req.Execute(method, rawURL)
 	if err != nil {
 		return nil, err
@@ -175,6 +183,11 @@ func (c *CookieClient) FollowRedirects(rawURL string, headers map[string]string)
 		if loc == "" {
 			return nil, &ServiceError{Msg: fmt.Sprintf("重定向缺失 Location (HTTP %d, %s)", resp.StatusCode, current)}
 		}
+		// 服务端 bug 容错：统一认证跳教务的 Location 含字面空格
+		// （…/sigin ?id_token=…），浏览器与 Dart http 会自动百分号编码；
+		// RawQuery 中的空格 Go 不会自动转义（会原样上请求行导致非法请求），
+		// 统一在解析前编码。
+		loc = strings.ReplaceAll(loc, " ", "%20")
 		next, err := u.Parse(loc)
 		if err != nil {
 			return nil, &ServiceError{Msg: fmt.Sprintf("重定向 Location 非法: %q", loc)}
