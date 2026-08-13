@@ -84,6 +84,17 @@ scu logout    # 退出登录并清除凭据
 
 ## 教务系统 `scu zhjw`
 
+所有编号类参数都有对应的发现命令，不用猜（各命令 `--help` 也标明了来源）：
+
+| 参数 | 来源 |
+|---|---|
+| `planCode` | `scu zhjw semesters` 输出的 `value` |
+| 校区/教学楼编号与名称 | `scu zhjw classroom index` → `campuses[].campusNumber/campusName`、`buildings[].teachingBuildingNumber/teachingBuildingName` |
+| 学院/年级代码 | `scu zhjw program colleges` / `grades` 输出的 `value` |
+| `fajhh` | `scu zhjw program search` 输出记录 |
+| `urlPath` | `scu zhjw program detail` 输出 `treeList` 节点 |
+| 院系/专业/班级编号 | `scu zhjw class options` → `subjects` → `list` 逐级获取 |
+
 ```bash
 scu zhjw week                          # 当前教学周
 scu zhjw semesters                     # 学期列表（value 为 planCode，如 2025-2026-2-1）
@@ -94,23 +105,23 @@ scu zhjw exams                         # 考表（考试安排）
 scu zhjw completion                    # 计划完成度
 scu zhjw calendar                      # 校历（免认证，网络优先、失败回退本地缓存）
 
-# 教室查询
-scu zhjw classroom index               # 校区与教学楼列表
+# 教室查询（编号链：index → types → query）
+scu zhjw classroom index               # 校区与教学楼列表（所有编号的来源）
 scu zhjw classroom types --campus-num 1 --building-num 101 --campus-name 江安 --building-name 一教A
 scu zhjw classroom query --campus-num 1 --building-num 101 --date 2026-08-14
 
-# 培养方案
-scu zhjw program colleges              # 学院列表
-scu zhjw program grades                # 年级列表
-scu zhjw program search --college 301 --grade 2023
-scu zhjw program detail <fajhh>        # 方案详情（含课程树）
-scu zhjw program course <urlPath>      # 课程详情（urlPath 来自方案详情 treeList）
+# 培养方案（编号链：colleges/grades → search → detail → course）
+scu zhjw program colleges              # 学院列表（value = --college）
+scu zhjw program grades                # 年级列表（value = --grade）
+scu zhjw program search --college 301 --grade 2023   # 记录含 fajhh
+scu zhjw program detail <fajhh>        # 方案详情（treeList 含 urlPath）
+scu zhjw program course <urlPath>      # 课程详情
 
-# 班级课表
-scu zhjw class options                 # 筛选项（学期/年级/院系）
-scu zhjw class subjects <departmentNum>
-scu zhjw class list --plan 2025-2026-2-1 --dept 301
-scu zhjw class schedule <planCode> <classCode>
+# 班级课表（编号链：options → subjects → list → schedule）
+scu zhjw class options                 # 筛选项（semesters/grades/departments 的 value）
+scu zhjw class subjects <departmentNum>                # 专业列表（含 subjectCode）
+scu zhjw class list --plan 2025-2026-2-1 --dept 301    # 记录含 id.executiveEducationPlanNumber / id.classNum
+scu zhjw class schedule <planCode> <classCode>         # 即上一步输出的两个字段
 ```
 
 ## 用户信息 `scu user`（微服务）
@@ -123,10 +134,12 @@ scu user devices    # 校园网在线设备
 
 ## 缴费平台 `scu balance`
 
+房间参数逐级发现（各级输出均为 `[{name, code}]`，上一级的 `code` 是下一级的入参）：
+
 ```bash
-scu balance campus                    # 校区列表
-scu balance buildings <schoolCode>    # 楼栋列表
-scu balance units <schoolCode> <regCode>
+scu balance campus                    # 校区列表，code = schoolCode
+scu balance buildings <schoolCode>    # 楼栋列表，code = regCode
+scu balance units <schoolCode> <regCode>  # 单元列表，code = unitCode
 
 # 查询余额（--type 1 照明电费 / 2 空调电费）
 # 首次查询需绑定房间：
@@ -148,18 +161,20 @@ scu fitness score --year 2025
 
 ## 第二课堂 `scu ccyl`
 
+ID 发现链：`activities`（→ `activityLibraryId`）→ `lib-detail`（→ `activityId`）→ `score-types`（→ `--score-type`）；`credits`（→ `creditId`）。
+
 ```bash
-scu ccyl activities --name 讲座 --page 1 --size 10   # 搜索活动库
+scu ccyl activities --name 讲座 --page 1 --size 10   # 搜索活动库，记录的 id = activityLibraryId
 scu ccyl mine                                        # 我参与的活动
 scu ccyl orgs                                        # 组织列表
+scu ccyl lib-detail <activityLibraryId>              # 活动系列详情，含场次活动 id = activityId
 scu ccyl detail <activityId>                         # 活动详情
-scu ccyl lib-detail <activityLibraryId>              # 活动系列详情
-scu ccyl score-types <activityLibraryId>             # 能力类型（报名参数）
+scu ccyl score-types <activityLibraryId>             # 能力类型，id = signup --score-type
 scu ccyl signup <activityId> --score-type <id>       # 报名
 scu ccyl cancel <activityId>                         # 取消报名
 scu ccyl subscribe <activityLibraryId>               # 预约活动系列
 scu ccyl unsubscribe <activityLibraryId>
-scu ccyl credits                                     # 成绩单（学分）
+scu ccyl credits                                     # 成绩单（记录含 creditId）
 scu ccyl export <email> <creditId...>                # 导出成绩单到邮箱
 ```
 

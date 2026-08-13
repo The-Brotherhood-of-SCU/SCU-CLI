@@ -71,7 +71,7 @@ func newPayAppService(scu *auth.ScuAuth) *api.PayAppService {
 
 var balanceCampusCmd = &cobra.Command{
 	Use:   "campus",
-	Short: "获取校区列表",
+	Short: "获取校区列表（[{name, code}]，code 即 schoolCode）",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runJSON(func() (interface{}, error) {
 			scu, err := newScuAuth()
@@ -85,7 +85,7 @@ var balanceCampusCmd = &cobra.Command{
 
 var balanceBuildingsCmd = &cobra.Command{
 	Use:   "buildings <schoolCode>",
-	Short: "获取楼栋列表",
+	Short: "获取楼栋列表（schoolCode 取自 campus 的 code；输出 code 即 regCode）",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runJSON(func() (interface{}, error) {
@@ -100,7 +100,7 @@ var balanceBuildingsCmd = &cobra.Command{
 
 var balanceUnitsCmd = &cobra.Command{
 	Use:   "units <schoolCode> <regCode>",
-	Short: "获取单元列表",
+	Short: "获取单元列表（regCode 取自 buildings 的 code；输出 code 即 unitCode）",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runJSON(func() (interface{}, error) {
@@ -182,9 +182,9 @@ func init() {
 
 	q := balanceQueryCmd.Flags()
 	q.IntVar(&balanceQueryArgs.type_, "type", 1, "查询类型：1 照明电费，2 空调电费")
-	q.StringVar(&balanceQueryArgs.schoolCode, "school-code", "", "校区代码（绑定时必填）")
-	q.StringVar(&balanceQueryArgs.regCode, "reg-code", "", "楼栋代码（绑定时必填）")
-	q.StringVar(&balanceQueryArgs.unitCode, "unit-code", "", "单元代码（无单元可空）")
+	q.StringVar(&balanceQueryArgs.schoolCode, "school-code", "", "校区代码（balance campus 的 code；绑定时必填）")
+	q.StringVar(&balanceQueryArgs.regCode, "reg-code", "", "楼栋代码（balance buildings 的 code；绑定时必填）")
+	q.StringVar(&balanceQueryArgs.unitCode, "unit-code", "", "单元代码（balance units 的 code；无单元可空）")
 	q.StringVar(&balanceQueryArgs.roomNo, "room", "", "房间号（提供时先绑定房间）")
 
 	balanceCmd.AddCommand(balanceCampusCmd, balanceBuildingsCmd, balanceUnitsCmd, balanceQueryCmd)

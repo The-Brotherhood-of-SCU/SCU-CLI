@@ -79,7 +79,7 @@ var ccylSearchArgs struct {
 
 var ccylActivitiesCmd = &cobra.Command{
 	Use:   "activities",
-	Short: "搜索第二课堂活动库",
+	Short: "搜索第二课堂活动库（记录的 id 即 activityLibraryId）",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runJSON(func() (interface{}, error) {
 			s, err := newCcylService()
@@ -122,7 +122,7 @@ var ccylOrgsCmd = &cobra.Command{
 
 var ccylDetailCmd = &cobra.Command{
 	Use:   "detail <activityId>",
-	Short: "获取活动详情",
+	Short: "获取活动详情（activityId 取自 lib-detail 输出的场次活动 id）",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runJSON(func() (interface{}, error) {
@@ -137,7 +137,7 @@ var ccylDetailCmd = &cobra.Command{
 
 var ccylLibDetailCmd = &cobra.Command{
 	Use:   "lib-detail <activityLibraryId>",
-	Short: "获取活动系列详情",
+	Short: "获取活动系列详情（含各场次活动，其 id 即 detail/signup 的 activityId）",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runJSON(func() (interface{}, error) {
@@ -152,7 +152,7 @@ var ccylLibDetailCmd = &cobra.Command{
 
 var ccylScoreTypesCmd = &cobra.Command{
 	Use:   "score-types <activityLibraryId>",
-	Short: "获取活动系列的能力类型（报名时需要 scoreType）",
+	Short: "获取活动系列的能力类型（输出 id 即 signup --score-type 的值）",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runJSON(func() (interface{}, error) {
@@ -169,7 +169,7 @@ var ccylSignUpScoreType string
 
 var ccylSignUpCmd = &cobra.Command{
 	Use:   "signup <activityId>",
-	Short: "报名活动（--score-type 能力类型，由 score-types 获取）",
+	Short: "报名活动（activityId 取自 lib-detail；--score-type 取自 score-types 的 id）",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runJSON(func() (interface{}, error) {
@@ -205,7 +205,7 @@ var ccylCancelCmd = &cobra.Command{
 
 var ccylSubscribeCmd = &cobra.Command{
 	Use:   "subscribe <activityLibraryId>",
-	Short: "预约活动系列",
+	Short: "预约活动系列（activityLibraryId 取自 activities 记录的 id）",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runJSON(func() (interface{}, error) {
@@ -223,7 +223,7 @@ var ccylSubscribeCmd = &cobra.Command{
 
 var ccylUnsubscribeCmd = &cobra.Command{
 	Use:   "unsubscribe <activityLibraryId>",
-	Short: "取消预约活动系列",
+	Short: "取消预约活动系列（activityLibraryId 取自 activities 记录的 id）",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runJSON(func() (interface{}, error) {
@@ -241,7 +241,7 @@ var ccylUnsubscribeCmd = &cobra.Command{
 
 var ccylCreditsCmd = &cobra.Command{
 	Use:   "credits",
-	Short: "获取第二课堂成绩单（学分）",
+	Short: "获取第二课堂成绩单（记录含 creditId，供 export 使用）",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runJSON(func() (interface{}, error) {
 			s, err := newCcylService()
@@ -255,7 +255,7 @@ var ccylCreditsCmd = &cobra.Command{
 
 var ccylExportCmd = &cobra.Command{
 	Use:   "export <email> <creditId1> [creditId2...]",
-	Short: "导出成绩单到邮箱",
+	Short: "导出成绩单到邮箱（creditId 取自 credits 输出记录）",
 	Args:  cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runJSON(func() (interface{}, error) {
@@ -293,7 +293,7 @@ func init() {
 	ccylCreditsCmd.Flags().IntVar(&ccylSearchArgs.page, "page", 1, "页码")
 	ccylCreditsCmd.Flags().IntVar(&ccylSearchArgs.size, "size", 10, "每页数量")
 
-	ccylSignUpCmd.Flags().StringVar(&ccylSignUpScoreType, "score-type", "", "能力类型 ID（由 score-types 获取）")
+	ccylSignUpCmd.Flags().StringVar(&ccylSignUpScoreType, "score-type", "", "能力类型 ID（score-types 输出的 id）")
 
 	ccylCmd.AddCommand(ccylActivitiesCmd, ccylMineCmd, ccylOrgsCmd, ccylDetailCmd,
 		ccylLibDetailCmd, ccylScoreTypesCmd, ccylSignUpCmd, ccylCancelCmd,

@@ -56,7 +56,7 @@ var zhjwWeekCmd = &cobra.Command{
 
 var zhjwSemestersCmd = &cobra.Command{
 	Use:   "semesters",
-	Short: "获取学期列表（value 为 planCode）",
+	Short: "获取学期列表（value 即 schedule/class list --plan 所需的 planCode）",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runJSON(func() (interface{}, error) {
 			s, err := newZhjwService()
@@ -142,7 +142,10 @@ var zhjwClassroomCmd = &cobra.Command{
 
 var zhjwClassroomIndexCmd = &cobra.Command{
 	Use:   "index",
-	Short: "获取校区与教学楼列表",
+	Short: "获取校区与教学楼列表（types/query 的编号来源）",
+	Long: `获取校区与教学楼列表，是 classroom types/query 所有编号参数的来源：
+  campuses[].campusNumber / campusName              → --campus-num / --campus-name
+  buildings[].teachingBuildingNumber / ...Name      → --building-num / --building-name`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runJSON(func() (interface{}, error) {
 			s, err := newZhjwService()
@@ -158,7 +161,7 @@ var classroomTypesArgs struct{ campusNum, buildingNum, campusName, buildingName 
 
 var zhjwClassroomTypesCmd = &cobra.Command{
 	Use:   "types",
-	Short: "获取教学楼教室类型列表",
+	Short: "获取教学楼教室类型列表（编号取自 classroom index）",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runJSON(func() (interface{}, error) {
 			s, err := newZhjwService()
@@ -175,7 +178,7 @@ var classroomQueryArgs struct{ campusNum, buildingNum, classType, className, sea
 
 var zhjwClassroomQueryCmd = &cobra.Command{
 	Use:   "query",
-	Short: "查询教室占用情况",
+	Short: "查询教室占用情况（编号取自 classroom index，类型取自 classroom types）",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runJSON(func() (interface{}, error) {
 			s, err := newZhjwService()
@@ -197,7 +200,7 @@ var zhjwProgramCmd = &cobra.Command{
 
 var zhjwProgramCollegesCmd = &cobra.Command{
 	Use:   "colleges",
-	Short: "获取学院列表",
+	Short: "获取学院列表（value 供 program search --college 使用）",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runJSON(func() (interface{}, error) {
 			s, err := newZhjwService()
@@ -211,7 +214,7 @@ var zhjwProgramCollegesCmd = &cobra.Command{
 
 var zhjwProgramGradesCmd = &cobra.Command{
 	Use:   "grades",
-	Short: "获取年级列表",
+	Short: "获取年级列表（value 供 program search --grade 使用）",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runJSON(func() (interface{}, error) {
 			s, err := newZhjwService()
@@ -227,7 +230,7 @@ var programSearchArgs struct{ college, grade string }
 
 var zhjwProgramSearchCmd = &cobra.Command{
 	Use:   "search",
-	Short: "搜索培养方案（--college 学院代码 --grade 年级）",
+	Short: "搜索培养方案（代码取自 program colleges/grades；输出含 fajhh）",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runJSON(func() (interface{}, error) {
 			s, err := newZhjwService()
@@ -241,7 +244,7 @@ var zhjwProgramSearchCmd = &cobra.Command{
 
 var zhjwProgramDetailCmd = &cobra.Command{
 	Use:   "detail <fajhh>",
-	Short: "获取培养方案详情",
+	Short: "获取培养方案详情（fajhh 取自 program search 记录；treeList 含 urlPath）",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runJSON(func() (interface{}, error) {
@@ -278,7 +281,7 @@ var zhjwClassCmd = &cobra.Command{
 
 var zhjwClassOptionsCmd = &cobra.Command{
 	Use:   "options",
-	Short: "获取班级课表筛选选项（学期/年级/院系）",
+	Short: "获取班级课表筛选项（semesters/grades/departments，供 subjects/list 使用）",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runJSON(func() (interface{}, error) {
 			s, err := newZhjwService()
@@ -292,7 +295,7 @@ var zhjwClassOptionsCmd = &cobra.Command{
 
 var zhjwClassSubjectsCmd = &cobra.Command{
 	Use:   "subjects <departmentNum>",
-	Short: "根据院系获取专业列表",
+	Short: "根据院系获取专业列表（departmentNum 取自 options 的 departments value；输出含 subjectCode）",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runJSON(func() (interface{}, error) {
@@ -309,7 +312,7 @@ var classListArgs struct{ plan, year, dept, subject, classNum string }
 
 var zhjwClassListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "搜索班级列表",
+	Short: "搜索班级列表（参数取自 options/subjects；输出 id.executiveEducationPlanNumber 与 id.classNum）",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runJSON(func() (interface{}, error) {
 			s, err := newZhjwService()
@@ -324,7 +327,7 @@ var zhjwClassListCmd = &cobra.Command{
 
 var zhjwClassScheduleCmd = &cobra.Command{
 	Use:   "schedule <planCode> <classCode>",
-	Short: "获取指定班级课表",
+	Short: "获取指定班级课表（planCode=class list 的 id.executiveEducationPlanNumber，classCode=id.classNum）",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runJSON(func() (interface{}, error) {
@@ -348,33 +351,33 @@ var zhjwCalendarCmd = &cobra.Command{
 }
 
 func init() {
-	zhjwScheduleCmd.Flags().StringVar(&zhjwSchedulePlan, "plan", "", "学期 planCode（如 2025-2026-2-1，省略取当前学期语义由教务决定）")
+	zhjwScheduleCmd.Flags().StringVar(&zhjwSchedulePlan, "plan", "", "学期 planCode（取自 zhjw semesters 的 value；省略取当前学期）")
 	zhjwGradesCmd.Flags().BoolVar(&zhjwGradesScheme, "scheme", false, "查询方案成绩而非及格成绩")
 
 	f := zhjwClassroomTypesCmd.Flags()
-	f.StringVar(&classroomTypesArgs.campusNum, "campus-num", "", "校区编号")
-	f.StringVar(&classroomTypesArgs.buildingNum, "building-num", "", "教学楼编号")
-	f.StringVar(&classroomTypesArgs.campusName, "campus-name", "", "校区名称")
-	f.StringVar(&classroomTypesArgs.buildingName, "building-name", "", "教学楼名称")
+	f.StringVar(&classroomTypesArgs.campusNum, "campus-num", "", "校区编号（classroom index 的 campuses[].campusNumber）")
+	f.StringVar(&classroomTypesArgs.buildingNum, "building-num", "", "教学楼编号（classroom index 的 buildings[].teachingBuildingNumber）")
+	f.StringVar(&classroomTypesArgs.campusName, "campus-name", "", "校区名称（campuses[].campusName）")
+	f.StringVar(&classroomTypesArgs.buildingName, "building-name", "", "教学楼名称（buildings[].teachingBuildingName）")
 
 	q := zhjwClassroomQueryCmd.Flags()
-	q.StringVar(&classroomQueryArgs.campusNum, "campus-num", "", "校区编号")
-	q.StringVar(&classroomQueryArgs.buildingNum, "building-num", "", "教学楼编号")
-	q.StringVar(&classroomQueryArgs.classType, "type", "", "教室类型代码")
-	q.StringVar(&classroomQueryArgs.className, "name", "", "教室名称")
-	q.StringVar(&classroomQueryArgs.seatFrom, "seat-from", "", "座位数下限")
-	q.StringVar(&classroomQueryArgs.seatTo, "seat-to", "", "座位数上限")
+	q.StringVar(&classroomQueryArgs.campusNum, "campus-num", "", "校区编号（同 classroom types）")
+	q.StringVar(&classroomQueryArgs.buildingNum, "building-num", "", "教学楼编号（同 classroom types）")
+	q.StringVar(&classroomQueryArgs.classType, "type", "", "教室类型代码（取自 classroom types 输出；可空）")
+	q.StringVar(&classroomQueryArgs.className, "name", "", "教室名称关键词（可空）")
+	q.StringVar(&classroomQueryArgs.seatFrom, "seat-from", "", "座位数下限（可空）")
+	q.StringVar(&classroomQueryArgs.seatTo, "seat-to", "", "座位数上限（可空）")
 	q.StringVar(&classroomQueryArgs.date, "date", "", "查询日期 YYYY-MM-DD（省略为当天）")
 
-	zhjwProgramSearchCmd.Flags().StringVar(&programSearchArgs.college, "college", "", "学院代码（xsh）")
-	zhjwProgramSearchCmd.Flags().StringVar(&programSearchArgs.grade, "grade", "", "年级（nj）")
+	zhjwProgramSearchCmd.Flags().StringVar(&programSearchArgs.college, "college", "", "学院代码（program colleges 的 value；可空）")
+	zhjwProgramSearchCmd.Flags().StringVar(&programSearchArgs.grade, "grade", "", "年级（program grades 的 value；可空）")
 
 	l := zhjwClassListCmd.Flags()
-	l.StringVar(&classListArgs.plan, "plan", "", "学期（executiveEducationPlanNum）")
-	l.StringVar(&classListArgs.year, "year", "", "年级（yearNum）")
-	l.StringVar(&classListArgs.dept, "dept", "", "院系编号（departmentNum）")
-	l.StringVar(&classListArgs.subject, "subject", "", "专业编号（subjectNum）")
-	l.StringVar(&classListArgs.classNum, "class-num", "", "班级编号（classNum）")
+	l.StringVar(&classListArgs.plan, "plan", "", "学期（class options 的 semesters[].value）")
+	l.StringVar(&classListArgs.year, "year", "", "年级（class options 的 grades[].value）")
+	l.StringVar(&classListArgs.dept, "dept", "", "院系编号（class options 的 departments[].value）")
+	l.StringVar(&classListArgs.subject, "subject", "", "专业编号（class subjects 输出的 subjectCode；可空）")
+	l.StringVar(&classListArgs.classNum, "class-num", "", "班级编号（可空，精确过滤）")
 
 	zhjwClassroomCmd.AddCommand(zhjwClassroomIndexCmd, zhjwClassroomTypesCmd, zhjwClassroomQueryCmd)
 	zhjwProgramCmd.AddCommand(zhjwProgramCollegesCmd, zhjwProgramGradesCmd, zhjwProgramSearchCmd, zhjwProgramDetailCmd, zhjwProgramCourseCmd)
