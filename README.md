@@ -13,17 +13,59 @@
 
 ## 安装
 
+### 从 Release 下载（推荐）
+
+[Releases](https://github.com/The-Brotherhood-of-SCU/SCU-CLI/releases) 提供各平台预编译单二进制（无依赖），资产附带 `checksums.txt`（SHA256）：
+
+| 平台 | 资产 |
+|---|---|
+| Linux amd64 / arm64 | `scu-linux-amd64` / `scu-linux-arm64` |
+| macOS Intel / Apple Silicon | `scu-darwin-amd64` / `scu-darwin-arm64` |
+| Windows amd64 / arm64 | `scu-windows-amd64.exe` / `scu-windows-arm64.exe` |
+
+```bash
+# Linux / macOS（以 linux-amd64 为例）
+curl -L -o scu https://github.com/The-Brotherhood-of-SCU/SCU-CLI/releases/latest/download/scu-linux-amd64
+chmod +x scu && sudo mv scu /usr/local/bin/
+```
+
+```powershell
+# Windows PowerShell
+Invoke-WebRequest -Uri https://github.com/The-Brotherhood-of-SCU/SCU-CLI/releases/latest/download/scu-windows-amd64.exe -OutFile scu.exe
+```
+
+### 其他方式
+
 ```bash
 go install github.com/The-Brotherhood-of-SCU/SCU-CLI/cmd/scu@latest
+# 或源码构建：git clone ... && go build -o scu ./cmd/scu
 ```
 
-或从源码构建：
+## AI Agent 集成（Skill）
+
+仓库附带 Agent Skill（`skill/SKILL.md`），Release 中以 `scu-cli-skill.zip` 分发，内含 `scu-cli/SKILL.md`（登录流程、输出约定、参数发现链、写操作准则）。安装后 agent 会在涉及川大校园服务时自动使用它。
+
+**1. 安装 CLI**：按上节从 Release 下载对应平台二进制并放入 `PATH`（skill 会指导 agent 完成，也可以你提前做好）。
+
+**2. 安装 Skill**：
 
 ```bash
-git clone https://github.com/The-Brotherhood-of-SCU/SCU-CLI
-cd SCU-CLI
-go build -o scu ./cmd/scu
+# 用户级（对所有项目生效）；项目级则解压到 <项目>/.claude/skills/
+mkdir -p ~/.claude/skills
+curl -L -o /tmp/scu-cli-skill.zip \
+  https://github.com/The-Brotherhood-of-SCU/SCU-CLI/releases/latest/download/scu-cli-skill.zip
+unzip -o /tmp/scu-cli-skill.zip -d ~/.claude/skills/
+# 结果：~/.claude/skills/scu-cli/SKILL.md
 ```
+
+```powershell
+# Windows PowerShell（用户级）
+Invoke-WebRequest -Uri https://github.com/The-Brotherhood-of-SCU/SCU-CLI/releases/latest/download/scu-cli-skill.zip -OutFile $env:TEMP\scu-cli-skill.zip
+Expand-Archive -Force $env:TEMP\scu-cli-skill.zip "$env:USERPROFILE\.claude\skills"
+```
+
+**3. 使用**：agent 会话中直接说"帮我查下学期的课表"即可。首次使用 agent 会按 skill 指引执行 `scu login -u <学号> -p <密码>`（验证码内置 OCR 自动识别），之后的会话续期全自动。
+
 
 ## 输出约定
 

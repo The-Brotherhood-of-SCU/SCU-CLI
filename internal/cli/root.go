@@ -5,9 +5,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Version 由构建时 -ldflags -X 注入（发布为标签名如 v0.1.0）；源码开发构建为 dev。
+var Version = "dev"
+
 var rootCmd = &cobra.Command{
-	Use:   "scu",
-	Short: "四川大学校园服务命令行工具",
+	Use:     "scu",
+	Short:   "四川大学校园服务命令行工具",
+	Version: Version,
 	Long: `scu 是四川大学校园服务的命令行接口，面向 AI 与脚本使用。
 
 覆盖服务：

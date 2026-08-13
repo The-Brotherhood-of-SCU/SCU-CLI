@@ -1,0 +1,70 @@
+name: Release
+
+# 推送 v* 标签时自动发布 Release：
+#   1. 跨平台构建 CLI 二进制（raw binary + checksums.txt）
+#   2. 打包 skill/ 目录为 scu-cli-skill.zip（内含 scu-cli/SKILL.md）
+#   3. 从 CHANGELOG.md 提取对应版本的章节作为 Release 说明
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build binaries
+        run: |
+          mkdir -p dist
+          targets="linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64"
+          for t in $targets; do
+            os=${t%/*}; arch=${t#*/}
+            out="dist/scu-${os}-${arch}"
+            if [ "$os" = "windows" ]; then out="$out.exe"; fi
+            CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath \
+              -ldflags "-s -w -X github.com/The-Brotherhood-of-SCU/SCU-CLI/internal/cli.Version=${GITHUB_REF_NAME}" \
+              -o "$out" ./cmd/scu
+          done
+          cd dist && sha256sum scu-* > checksums.txt
+
+      - name: Package skill
+        run: |
+          # 归档内目录名即安装后的技能目录名（~/.claude/skills/scu-cli/）
+          mkdir -p dist/scu-cli
+          cp skill/SKILL.md dist/scu-cli/
+          cd dist && zip -r scu-cli-skill.zip scu-cli && rm -rf scu-cli
+
+      - name: Extract release notes from CHANGELOG.md
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v ver="$version" '
+            /^## \[/ {
+              if (found) exit
+              if (index($0, "[" ver "]") > 0) found = 1
+              next
+            }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          if ! grep -q '[^[:space:]]' release-notes.md; then
+            echo "::error::CHANGELOG.md 中未找到版本 [$version] 的章节"
+            exit 1
+          fi
+          cat release-notes.md
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release-notes.md
+          fail_on_unmatched_files: true
+          files: |
+            dist/scu-*
+            dist/checksums.txt
