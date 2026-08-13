@@ -38,9 +38,9 @@ jobs:
 
       - name: Package skill
         run: |
-          # 归档内目录名即安装后的技能目录名（~/.claude/skills/scu-cli/）
-          mkdir -p dist/scu-cli
-          cp skill/SKILL.md dist/scu-cli/
+          # skill/scu-cli/ 即技能目录本体（目录名 = 技能名），直接打包；
+          # 解压到 ~/.claude/skills/ 即为标准安装结构
+          cp -r skill/scu-cli dist/
           cd dist && zip -r scu-cli-skill.zip scu-cli && rm -rf scu-cli
 
       - name: Extract release notes from CHANGELOG.md

@@ -43,7 +43,7 @@ go install github.com/The-Brotherhood-of-SCU/SCU-CLI/cmd/scu@latest
 
 ## AI Agent 集成（Skill）
 
-仓库附带 Agent Skill（`skill/SKILL.md`），Release 中以 `scu-cli-skill.zip` 分发，内含 `scu-cli/SKILL.md`（登录流程、输出约定、参数发现链、写操作准则）。安装后 agent 会在涉及川大校园服务时自动使用它。
+仓库附带 Agent Skill（`skill/scu-cli/SKILL.md`），Release 中以 `scu-cli-skill.zip` 分发，内含 `scu-cli/SKILL.md`（登录流程、输出约定、全部命令文档、参数发现链、写操作准则）。安装后 agent 会在涉及川大校园服务时自动使用它。
 
 **1. 安装 CLI**：按上节从 Release 下载对应平台二进制并放入 `PATH`（skill 会指导 agent 完成，也可以你提前做好）。
 
@@ -257,6 +257,7 @@ internal/
   ocr/              验证码本地 OCR（质心模板匹配，权重移植自 scu-plus）
   config/           凭据持久化（0600）
   output/           统一 JSON 输出包层
+skill/scu-cli/      Agent Skill（SKILL.md，Release 打包为 scu-cli-skill.zip）
 ```
 
 ## 技术栈

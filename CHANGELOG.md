@@ -22,7 +22,7 @@
 - 统一 JSON 输出包层（stdout）与机器可读错误分类（unauthenticated/service/login/config/input）
 - 非 TTY 环境下交互输入立即失败（面向 AI 调用，绝不阻塞）
 - 所有 num/id/code 参数在 `--help` 与 README 中标注发现链（来源命令 + 输出字段）
-- 附带 Agent Skill（`skill/SKILL.md`），Release 中以 `scu-cli-skill.zip` 分发
+- 附带 Agent Skill（`skill/scu-cli/SKILL.md`），Release 中以 `scu-cli-skill.zip` 分发
 
 ### 修复
 
