@@ -31,9 +31,9 @@ var payHeaders = map[string]string{
 
 // payAuthPaths 重定向到这些路径说明缴费 session 已失效。
 var payAuthPaths = map[string]bool{
-	"/eleFees/index.html":          true,
-	"/eleFees/oauth/airWarrant":    true,
-	"/eleFees/oauth/lightWarrant":  true,
+	"/eleFees/index.html":         true,
+	"/eleFees/oauth/airWarrant":   true,
+	"/eleFees/oauth/lightWarrant": true,
 }
 
 // checkPayExpiry 识别缴费平台认证失效（与 Bugaoshan 一致）：

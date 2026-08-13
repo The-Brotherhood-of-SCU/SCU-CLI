@@ -337,6 +337,16 @@ var zhjwClassScheduleCmd = &cobra.Command{
 	},
 }
 
+var zhjwCalendarCmd = &cobra.Command{
+	Use:   "calendar",
+	Short: "获取校历（免认证，网络优先、失败回退本地缓存）",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runJSON(func() (interface{}, error) {
+			return api.FetchAcademicCalendar()
+		})
+	},
+}
+
 func init() {
 	zhjwScheduleCmd.Flags().StringVar(&zhjwSchedulePlan, "plan", "", "学期 planCode（如 2025-2026-2-1，省略取当前学期语义由教务决定）")
 	zhjwGradesCmd.Flags().BoolVar(&zhjwGradesScheme, "scheme", false, "查询方案成绩而非及格成绩")
@@ -369,5 +379,5 @@ func init() {
 	zhjwClassroomCmd.AddCommand(zhjwClassroomIndexCmd, zhjwClassroomTypesCmd, zhjwClassroomQueryCmd)
 	zhjwProgramCmd.AddCommand(zhjwProgramCollegesCmd, zhjwProgramGradesCmd, zhjwProgramSearchCmd, zhjwProgramDetailCmd, zhjwProgramCourseCmd)
 	zhjwClassCmd.AddCommand(zhjwClassOptionsCmd, zhjwClassSubjectsCmd, zhjwClassListCmd, zhjwClassScheduleCmd)
-	zhjwCmd.AddCommand(zhjwWeekCmd, zhjwSemestersCmd, zhjwScheduleCmd, zhjwGradesCmd, zhjwExamsCmd, zhjwCompletionCmd, zhjwClassroomCmd, zhjwProgramCmd, zhjwClassCmd)
+	zhjwCmd.AddCommand(zhjwWeekCmd, zhjwSemestersCmd, zhjwScheduleCmd, zhjwGradesCmd, zhjwExamsCmd, zhjwCompletionCmd, zhjwCalendarCmd, zhjwClassroomCmd, zhjwProgramCmd, zhjwClassCmd)
 }

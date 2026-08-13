@@ -177,10 +177,10 @@ func ccylLoginByCode(code string) (token, userID string, err error) {
 		return "", "", &ServiceError{Msg: fmt.Sprintf("第二课堂登录请求失败: %v", err)}
 	}
 	var out struct {
-		Code int    `json:"code"`
-		Msg  string `json:"msg"`
+		Code  int    `json:"code"`
+		Msg   string `json:"msg"`
 		Token string `json:"token"`
-		User struct {
+		User  struct {
 			ID string `json:"id"`
 		} `json:"user"`
 	}

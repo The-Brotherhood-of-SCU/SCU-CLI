@@ -537,9 +537,9 @@ func (s *ZhjwService) FetchProgramDetail(fajhh string) (map[string]interface{}, 
 func (s *ZhjwService) FetchCourseDetail(urlPath string) (map[string]interface{}, error) {
 	v, err := s.request(func(c *auth.CookieClient) (interface{}, error) {
 		resp, err := c.Get(zbase+urlPath, map[string]string{
-			"Accept":       "application/json, */*",
-			"Referer":      zbase + "/student/comprehensiveQuery/search/trainProgram/index",
-			"User-Agent":   auth.DefaultUserAgent,
+			"Accept":     "application/json, */*",
+			"Referer":    zbase + "/student/comprehensiveQuery/search/trainProgram/index",
+			"User-Agent": auth.DefaultUserAgent,
 		})
 		if err != nil {
 			return nil, err
@@ -757,4 +757,3 @@ func (s *ZhjwService) FetchClassSchedule(planCode, classCode string) ([]interfac
 	}
 	return v.([]interface{}), nil
 }
-

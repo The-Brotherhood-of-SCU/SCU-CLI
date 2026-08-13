@@ -38,8 +38,8 @@ type Response struct {
 //   - 跨源转发敏感 header 必须通过 AllowSensitiveOrigin 明确允许；
 //   - 重定向最多 10 跳。
 type CookieClient struct {
-	mu sync.Mutex
-	rc *resty.Client
+	mu  sync.Mutex
+	rc  *resty.Client
 	jar *cookiejar.Jar
 
 	sensitiveAllowedOrigins map[string]bool

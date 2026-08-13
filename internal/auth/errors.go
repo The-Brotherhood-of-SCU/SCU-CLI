@@ -23,7 +23,7 @@ func (e *RateLimitedError) Error() string { return e.Msg }
 
 // LoginError 表示验证码、账号密码或登录接口错误。
 type LoginError struct {
-	Msg    string
+	Msg string
 	// InvalidCaptcha 为 true 时调用方可换验证码重试。
 	InvalidCaptcha bool
 }

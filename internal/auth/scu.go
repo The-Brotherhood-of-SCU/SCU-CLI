@@ -50,7 +50,7 @@ type ScuAuth struct {
 
 	creds *config.Credentials
 
-	client       *CookieClient // 已绑定 id.scu.edu.cn session 的 client
+	client *CookieClient // 已绑定 id.scu.edu.cn session 的 client
 
 	// SolveCaptcha 用于 token 彻底失效后的自动重新登录；nil 表示不支持。
 	SolveCaptcha CaptchaSolver
@@ -118,7 +118,7 @@ func fetchSM2Key(client *CookieClient) (publicKey, code string, err error) {
 		if attempt > 0 {
 			time.Sleep(500 * time.Millisecond)
 		}
-		resp, reqErr := client.Do("POST", idBase+"/api/public/bff/v1.2/sm2_key", idHeaders, nil)
+		resp, reqErr := client.Do("POST", idBase+"/api/public/bff/v1.2/sm2_key", idHeaders, bytesReader([]byte("{}")))
 		if reqErr != nil {
 			continue
 		}
