@@ -9,7 +9,17 @@ description: 使用 scu CLI 操作四川大学校园服务（教务课表/成绩
 
 ## 1. 安装 CLI
 
-从 GitHub Release 下载对应平台的单个二进制（无依赖，资产附带 `checksums.txt` 可校验 SHA256）：
+先探测：`scu --version` 能跑通则跳过本节。
+
+**方式 A — npm（首选，一条命令）**：
+
+```bash
+npm install -g scu-cli
+```
+
+需要 Node.js ≥ 18。自动按平台/架构（linux / darwin / windows × amd64 / arm64）下载二进制（SHA256 校验），并把本 Skill 安装到 `~/.claude/skills/scu-cli/`（用户设 `SCU_CLI_NO_SKILL=1` 时会跳过）。
+
+**方式 B — GitHub Release 二进制**（无 Node 环境时；资产附带 `checksums.txt` 可校验 SHA256）：
 
 | 平台 | 资产 |
 |---|---|
@@ -28,7 +38,7 @@ chmod +x scu && sudo mv scu /usr/local/bin/
 Invoke-WebRequest -Uri https://github.com/The-Brotherhood-of-SCU/SCU-CLI/releases/latest/download/scu-windows-amd64.exe -OutFile scu.exe
 ```
 
-也可以 `go install github.com/The-Brotherhood-of-SCU/SCU-CLI/cmd/scu@latest`。
+**方式 C**：`go install github.com/The-Brotherhood-of-SCU/SCU-CLI/cmd/scu@latest`
 
 验证：`scu --version`、`scu --help`。
 

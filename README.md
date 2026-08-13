@@ -13,7 +13,20 @@
 
 ## 安装
 
-### 从 Release 下载（推荐）
+### npm 一键安装（推荐，面向 AI）
+
+```bash
+npm install -g scu-cli   # 需要 Node.js ≥ 18
+```
+
+一条命令完成两件事：
+
+1. 按当前平台/架构（linux / darwin / windows × amd64 / arm64）自动下载预编译二进制并做 SHA256 校验（二进制托管在 GitHub Release，npm 包本身只有安装器）
+2. 自动把 Claude Code Skill 安装到 `~/.claude/skills/scu-cli/`（设 `SCU_CLI_NO_SKILL=1` 可跳过）
+
+装好后 `scu` 直接在 PATH 中，验证：`scu --version`。
+
+### 从 Release 下载
 
 [Releases](https://github.com/The-Brotherhood-of-SCU/SCU-CLI/releases) 提供各平台预编译单二进制（无依赖），资产附带 `checksums.txt`（SHA256）：
 
@@ -45,6 +58,16 @@ go install github.com/The-Brotherhood-of-SCU/SCU-CLI/cmd/scu@latest
 
 仓库附带 Agent Skill（`skill/scu-cli/SKILL.md`），Release 中以 `scu-cli-skill.zip` 分发，内含 `scu-cli/SKILL.md`（登录流程、输出约定、全部命令文档、参数发现链、写操作准则）。安装后 agent 会在涉及川大校园服务时自动使用它。
 
+**一键安装（推荐）**：
+
+```bash
+npm install -g scu-cli
+```
+
+CLI 与 Skill 一次装好，之后 agent 会话中直接说"帮我查下学期的课表"即可。首次使用 agent 会按 skill 指引执行 `scu login -u <学号> -p <密码>`（验证码内置 OCR 自动识别），之后的会话续期全自动。
+
+**手动安装（无 Node 环境）**：
+
 **1. 安装 CLI**：按上节从 Release 下载对应平台二进制并放入 `PATH`（skill 会指导 agent 完成，也可以你提前做好）。
 
 **2. 安装 Skill**：
@@ -63,8 +86,6 @@ unzip -o /tmp/scu-cli-skill.zip -d ~/.claude/skills/
 Invoke-WebRequest -Uri https://github.com/The-Brotherhood-of-SCU/SCU-CLI/releases/latest/download/scu-cli-skill.zip -OutFile $env:TEMP\scu-cli-skill.zip
 Expand-Archive -Force $env:TEMP\scu-cli-skill.zip "$env:USERPROFILE\.claude\skills"
 ```
-
-**3. 使用**：agent 会话中直接说"帮我查下学期的课表"即可。首次使用 agent 会按 skill 指引执行 `scu login -u <学号> -p <密码>`（验证码内置 OCR 自动识别），之后的会话续期全自动。
 
 
 ## 输出约定
@@ -258,6 +279,7 @@ internal/
   config/           凭据持久化（0600）
   output/           统一 JSON 输出包层
 skill/scu-cli/      Agent Skill（SKILL.md，Release 打包为 scu-cli-skill.zip）
+install.js bin/scu.js  npm 安装器（postinstall 从 Release 下载二进制并安装 Skill）
 ```
 
 ## 技术栈

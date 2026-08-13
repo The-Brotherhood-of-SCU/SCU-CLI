@@ -27,6 +27,11 @@ go.work.sum
 # env file
 .env
 
+# npm（install.js 下载的二进制；bin/scu.exe 已被 *.exe 覆盖）
+node_modules/
+*.tgz
+bin/scu
+
 # Editor/IDE
 # .idea/
 # .vscode/

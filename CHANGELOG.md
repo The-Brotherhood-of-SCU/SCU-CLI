@@ -2,7 +2,13 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-发布流程：推送 `vX.Y.Z` 标签触发 GitHub Action，自动从本文件提取对应版本章节作为 Release 说明。
+发布流程：推送 `vX.Y.Z` 标签触发 GitHub Action，自动从本文件提取对应版本章节作为 Release 说明，并在 Release 完成后将包发布到 npm（需在仓库 secrets 配置 `NPM_TOKEN`）。
+
+## [0.2.0] - 2026-08-13
+
+### 新增
+
+- npm 分发：`npm install -g scu-cli` 一键安装——按平台/架构自动从 GitHub Release 下载二进制（SHA256 校验），并自动把 Claude Code Skill 安装到 `~/.claude/skills/scu-cli/`（`SCU_CLI_NO_SKILL=1` 跳过）；标签推送时 CI 在 Release 完成后同步发布到 npm
 
 ## [0.1.0] - 2026-08-13
 
@@ -30,4 +36,5 @@
 - SSO 重定向链无法工作：`resty.NoRedirectPolicy()` 使任何 3xx 响应变成传输错误（auto redirect is disabled），改为 `http.ErrUseLastResponse` 哨兵；同时恢复各 API 层「302 = 会话过期」的检测能力
 - 容错统一认证跳教务的畸形 Location（`/sigin ?id_token=…` 含字面空格，百分号编码后与浏览器/Dart 行为一致）
 
+[0.2.0]: https://github.com/The-Brotherhood-of-SCU/SCU-CLI/releases/tag/v0.2.0
 [0.1.0]: https://github.com/The-Brotherhood-of-SCU/SCU-CLI/releases/tag/v0.1.0

@@ -1,0 +1,37 @@
+{
+  "name": "scu-cli",
+  "version": "0.2.0",
+  "description": "四川大学校园服务命令行工具（教务/微服务/缴费/体测/第二课堂），面向 AI 代理与脚本设计",
+  "bin": {
+    "scu": "bin/scu.js"
+  },
+  "scripts": {
+    "postinstall": "node install.js"
+  },
+  "files": [
+    "bin/scu.js",
+    "install.js",
+    "skill/scu-cli",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/The-Brotherhood-of-SCU/SCU-CLI.git"
+  },
+  "homepage": "https://github.com/The-Brotherhood-of-SCU/SCU-CLI",
+  "bugs": "https://github.com/The-Brotherhood-of-SCU/SCU-CLI/issues",
+  "keywords": [
+    "scu",
+    "sichuan-university",
+    "四川大学",
+    "cli",
+    "ai-agent",
+    "claude-skill"
+  ]
+}
