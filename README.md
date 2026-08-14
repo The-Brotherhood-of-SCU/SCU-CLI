@@ -97,6 +97,8 @@ stdout 恒为单个 JSON 对象，诊断信息走 stderr：
 | 命令 | 说明 |
 |---|---|
 | `applications [--status 0\|1\|3] [--page N]` | 我的申请列表（请假/报备等事项的进度，状态看 `inst_status` 字段） |
+| `form <app_id>` | 查看事项表单结构（字段 key/类型/选项/必填/预填值/日期校验） |
+| `submit <app_id> --fields '<json>' [--attach Key=path] [--dry-run]` | 动态表单提交（选项/日期/省市区/附件类型感知，ShowHide 显隐与必填本地校验，先 `--dry-run` 预览提交体） |
 
 ## AI Agent Skill
 

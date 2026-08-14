@@ -195,9 +195,40 @@ scu service applications                    # 我的申请列表（--status 0全
 #   列表项：app_name 事项名、created 提交时间、inst_status 中文状态文案（不要自己映射 status 数字）
 ```
 
+事项办理（动态表单，三步）：
+
+```bash
+# ① 查看表单结构：fields 按填写顺序给出 key/label/type/required/options/prefilled，
+#    date_rules 为日期顺序校验（first_key 必须早于等于 second_key）
+scu service form 350
+
+# ② 组装字段并预览提交体（强烈建议先 dry-run 给用户确认）
+scu service submit 350 --fields '{"Radio_30":"1","Input_31":"成都市","Calendar_40":"2026-08-14"}' --dry-run
+
+# ③ 确认后正式提交（去掉 --dry-run）
+scu service submit 350 --fields '{"Radio_30":"1","Input_31":"成都市","Calendar_40":"2026-08-14"}'
+```
+
+`--fields` 的值按 form 输出的 type 给：
+
+| type | 值形态 |
+|---|---|
+| input / multiInput / dataSource | 字符串 |
+| radio / select / selectV2 | options 里的 `value` 字符串 |
+| checkbox | value 字符串数组 `["1","2"]` |
+| calendar | `"2026-08-14"` 或 `"2026-08-14 10:00"` |
+| region | `{"province":"四川省","city":"成都市","area":"武侯区","details":"详细地址"}`（省/市/区给名称或 6 位编码，直辖市可省略 city） |
+| file | 不走 --fields，用 `--attach File_71=./照片.png`（可重复，上限见 max_count） |
+
+注意：
+- 只读/隐藏/user 字段由服务端透传，不要出现在 --fields 里（会报错）。
+- dataSource 字段给出名称后 CLI 自动取数联动（如导师姓名 → 回填工号/日期等配对字段），取数失败降级为仅提交名称并在 warnings 中说明。
+- 选项 value 合法性、必填、ShowHide 动态显隐/动态必填、日期顺序都在本地校验，报错即修正后重试。
+- 输出的 warnings 非空时要如实转告用户。
+
 ## 11. 行为准则
 
-- **写操作先确认**：`ccyl signup/cancel/subscribe/unsubscribe/export`、`user offline`、`balance query` 首次绑房等写操作，执行前向用户确认目标与参数；失败后不要自动重试（CLI 自身也不会重放写请求），先把错误报给用户。
+- **写操作先确认**：`ccyl signup/cancel/subscribe/unsubscribe/export`、`user offline`、`service submit`（先 --dry-run 给用户看提交体）、`balance query` 首次绑房等写操作，执行前向用户确认目标与参数；失败后不要自动重试（CLI 自身也不会重放写请求），先把错误报给用户。
 - 只读命令可自由串行调用；优先用发现链逐级取 ID，不要向用户索要可以自动发现的编号。
 - 凭据文件含账号密码，不要打印、复制或外发其内容。
 - `unauthenticated` 错误一律引导重新登录，不要尝试其他绕过方式。
