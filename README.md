@@ -103,7 +103,7 @@ stdout 恒为单个 JSON 对象，诊断信息走 stderr：
 
 ## AI Agent Skill
 
-npm 安装时已将 Skill 装入 `~/.claude/skills/scu-cli/`（Release 另附 `scu-cli-skill.zip` 供手动安装）。装好后 agent 会话中直接说"查一下我下学期的课表"即可；登录流程、参数发现链、写操作准则等细节均由 Skill 指导 agent 完成。
+npm 安装时已将 Skill 装入 `~/.claude/skills/scu-cli/`（Release 另附 `scu-cli-skill.zip` 供手动安装；发布时同步上架 [SkillHub](https://www.skillhub.cn)，slug `scu-cli`）。装好后 agent 会话中直接说"查一下我下学期的课表"即可；登录流程、参数发现链、写操作准则等细节均由 Skill 指导 agent 完成。
 
 ## 许可证
 

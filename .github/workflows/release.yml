@@ -8,6 +8,12 @@ name: Release
 #      Release 下载二进制，所以必须在 Release 之后）
 #      前提：npmjs.com 包设置页配置 Trusted Publisher =
 #      The-Brotherhood-of-SCU / SCU-CLI / release.yml
+#   5. 同步发布 Skill 到 SkillHub（https://www.skillhub.cn，CLI 方式，
+#      见 https://skillhub.cn/ai/release.md）
+#      前提：仓库 Secret SKILLHUB_KEY = skillhub.cn 个人中心创建的 API Token
+#      （需先完成实名认证）；未配置时该 job 告警跳过，不影响 Release/npm。
+#      注意：slug（skill/scu-cli/SKILL.md 的 slug 字段）全网唯一，若发布报
+#      slug 冲突需改名后保持固定；发布后进入 pending_review 审核。
 on:
   push:
     tags:
@@ -95,3 +101,62 @@ jobs:
 
       - name: Publish to npm
         run: npm publish --access public
+
+  # 发布 Skill 到 SkillHub（与 npm job 并行，只需源码，不依赖 Release 产物；
+  # needs: release 保证构建失败时不发布任何渠道）。
+  # skillhub CLI 官方安装脚本仅支持 macOS/Linux，ubuntu runner 满足。
+  skillhub:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # checkout
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check SKILLHUB_KEY
+        id: key
+        env:
+          SKILLHUB_KEY: ${{ secrets.SKILLHUB_KEY }}
+        run: |
+          if [ -z "${SKILLHUB_KEY:-}" ]; then
+            echo "::warning::未配置 Secret SKILLHUB_KEY，跳过 SkillHub 发布（见 release.yml 头部注释）"
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install SkillHub CLI
+        if: steps.key.outputs.present == 'true'
+        run: |
+          curl -fsSL https://skillhub.cn/install/install.sh | bash -s -- --cli-only
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/skillhub" --version
+
+      - name: Stamp skill version from tag
+        if: steps.key.outputs.present == 'true'
+        # SKILL.md 的 version 以标签为准（语义化版本，去掉 v 前缀）
+        run: |
+          sed -i "s/^version: .*/version: ${GITHUB_REF_NAME#v}/" skill/scu-cli/SKILL.md
+
+      - name: Login and dry-run
+        if: steps.key.outputs.present == 'true'
+        env:
+          SKILLHUB_KEY: ${{ secrets.SKILLHUB_KEY }}
+        run: |
+          skillhub login --key "$SKILLHUB_KEY" --host https://api.skillhub.cn
+          skillhub publish skill/scu-cli --host https://api.skillhub.cn --dry-run
+
+      - name: Publish to SkillHub
+        if: steps.key.outputs.present == 'true'
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          notes=$(awk -v ver="$version" '
+            /^## \[/ {
+              if (found) exit
+              if (index($0, "[" ver "]") > 0) found = 1
+              next
+            }
+            found { print }
+          ' CHANGELOG.md)
+          skillhub publish skill/scu-cli --host https://api.skillhub.cn \
+            --changelog "${notes:-发布 $version}"
