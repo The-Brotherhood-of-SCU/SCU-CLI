@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"net/url"
 	"strings"
 
 	"github.com/The-Brotherhood-of-SCU/SCU-CLI/internal/auth"
@@ -161,4 +162,32 @@ func (s *WfwService) FetchNetworkDevices() ([]interface{}, error) {
 		return nil, err
 	}
 	return v.([]interface{}), nil
+}
+
+// ForceNetworkDeviceOffline 强制指定校园网设备下线。
+// deviceID/ip 原样取自 FetchNetworkDevices 输出元素的 device_id/ip 字段。
+// 注意与 get-index 不同：该接口要求 form-urlencoded body。
+func (s *WfwService) ForceNetworkDeviceOffline(deviceID, ip string) error {
+	headers := map[string]string{}
+	for k, v := range wfwNetworkHeaders {
+		if !strings.EqualFold(k, "Content-Type") {
+			headers[k] = v
+		}
+	}
+	form := url.Values{"device_id": {deviceID}, "ip": {ip}}
+	_, err := s.request(func(c *auth.CookieClient) (interface{}, error) {
+		resp, err := c.PostForm(wfwBase+"/netclient/wap/default/offline", headers, form)
+		if err != nil {
+			return nil, err
+		}
+		json, err := decodeWfwResponse(string(resp.Body), resp.StatusCode)
+		if err != nil {
+			return nil, err
+		}
+		if !wfwSuccess(json) {
+			return nil, wfwBusinessError(json, "设备下线失败")
+		}
+		return nil, nil
+	})
+	return err
 }

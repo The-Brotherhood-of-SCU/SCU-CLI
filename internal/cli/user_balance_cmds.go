@@ -49,7 +49,7 @@ var userLabelsCmd = &cobra.Command{
 
 var userDevicesCmd = &cobra.Command{
 	Use:   "devices",
-	Short: "获取校园网在线设备列表",
+	Short: "获取校园网在线设备列表（输出 device_id / ip，供 offline 使用）",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runJSON(func() (interface{}, error) {
 			s, err := newWfwService()
@@ -57,6 +57,32 @@ var userDevicesCmd = &cobra.Command{
 				return nil, err
 			}
 			return s.FetchNetworkDevices()
+		})
+	},
+}
+
+var userOfflineArgs struct{ deviceID, ip string }
+
+var userOfflineCmd = &cobra.Command{
+	Use:   "offline",
+	Short: "强制指定校园网设备下线（--device-id / --ip 取自 user devices 输出）",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runJSON(func() (interface{}, error) {
+			if userOfflineArgs.deviceID == "" || userOfflineArgs.ip == "" {
+				return nil, errors.New("必须提供 --device-id 与 --ip（取自 user devices 输出）")
+			}
+			s, err := newWfwService()
+			if err != nil {
+				return nil, err
+			}
+			if err := s.ForceNetworkDeviceOffline(userOfflineArgs.deviceID, userOfflineArgs.ip); err != nil {
+				return nil, err
+			}
+			return map[string]interface{}{
+				"message":   "设备已下线",
+				"device_id": userOfflineArgs.deviceID,
+				"ip":        userOfflineArgs.ip,
+			}, nil
 		})
 	},
 }
@@ -178,7 +204,10 @@ var balanceQueryCmd = &cobra.Command{
 }
 
 func init() {
-	userCmd.AddCommand(userInfoCmd, userLabelsCmd, userDevicesCmd)
+	userOfflineCmd.Flags().StringVar(&userOfflineArgs.deviceID, "device-id", "", "设备 ID（user devices 输出的 device_id）")
+	userOfflineCmd.Flags().StringVar(&userOfflineArgs.ip, "ip", "", "设备 IP（user devices 输出的 ip）")
+
+	userCmd.AddCommand(userInfoCmd, userLabelsCmd, userDevicesCmd, userOfflineCmd)
 
 	q := balanceQueryCmd.Flags()
 	q.IntVar(&balanceQueryArgs.type_, "type", 1, "查询类型：1 照明电费，2 空调电费")

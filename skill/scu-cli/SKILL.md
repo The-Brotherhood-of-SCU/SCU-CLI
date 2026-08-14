@@ -128,7 +128,8 @@ scu zhjw class schedule <planCode> <classCode>         # 即上一步输出的�
 ```bash
 scu user info       # 基本信息（realname 姓名、role.number 学号等）
 scu user labels     # 用户标签
-scu user devices    # 校园网在线设备
+scu user devices    # 校园网在线设备（输出 device_id / ip）
+scu user offline --device-id <id> --ip <ip>   # 强制指定设备下线（参数取自 devices 输出）
 ```
 
 ## 7. 缴费平台 `scu balance`
@@ -180,7 +181,7 @@ scu ccyl export <email> <creditId...>                # 导出成绩单到邮箱
 
 ## 10. 行为准则
 
-- **写操作先确认**：`ccyl signup/cancel/subscribe/unsubscribe/export`、`balance query` 首次绑房等写操作，执行前向用户确认目标与参数；失败后不要自动重试（CLI 自身也不会重放写请求），先把错误报给用户。
+- **写操作先确认**：`ccyl signup/cancel/subscribe/unsubscribe/export`、`user offline`、`balance query` 首次绑房等写操作，执行前向用户确认目标与参数；失败后不要自动重试（CLI 自身也不会重放写请求），先把错误报给用户。
 - 只读命令可自由串行调用；优先用发现链逐级取 ID，不要向用户索要可以自动发现的编号。
 - 凭据文件含账号密码，不要打印、复制或外发其内容。
 - `unauthenticated` 错误一律引导重新登录，不要尝试其他绕过方式。

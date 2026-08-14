@@ -65,6 +65,7 @@ stdout 恒为单个 JSON 对象，诊断信息走 stderr：
 | 命令 | 说明 |
 |---|---|
 | `info` / `labels` / `devices` | 基本信息 / 用户标签 / 校园网在线设备 |
+| `offline --device-id <id> --ip <ip>` | 强制指定校园网设备下线（参数取自 devices 输出） |
 
 ### 电费 `scu balance`
 
