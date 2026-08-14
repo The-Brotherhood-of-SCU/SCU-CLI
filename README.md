@@ -73,7 +73,8 @@ stdout 恒为单个 JSON 对象，诊断信息走 stderr：
 | 命令 | 说明 |
 |---|---|
 | `campus → buildings → units` | 逐级发现校区/楼栋/单元 code |
-| `query --type 1\|2 [--school-code … --room …]` | 照明/空调电费余额；首次带房间参数即绑定，之后直接查 |
+| `query --type 1\|2 [--school-code … --room …]` | 照明/空调电费余额；首次带房间参数即绑定，之后直接查；每次成功自动记录本地趋势快照 |
+| `trend [--type 1\|2] [--days N]` | 余额趋势分析（北京日历日聚合、充值段自动跳过，输出日均消耗/累计与 daily_points 序列） |
 
 ### 体测 `scu fitness`
 

@@ -154,7 +154,15 @@ scu balance query --type 1 --school-code 1 --reg-code 101 --unit-code 1 --room 1
 # 之后直接查询已绑定房间：
 scu balance query --type 1
 scu balance query --type 2            # 空调电费
+
+# 余额趋势：每次 query 成功自动记录本地快照（按房间+类型归集，保留 365 天）
+scu balance trend --type 1            # 日均电费/日均度数/累计消耗 + daily_points 序列
+scu balance trend --type 1 --days 30  # 只统计最近 30 天
 ```
+
+trend 说明：快照按北京日历日聚合（每日取最后一条），充值段（余额上升）自动跳过并计入
+`skipped_recharge_segments`；`record_count` 为 0 时表示还没积累快照（用 note 字段的话术回复用户，
+过几天查询后再看）。
 
 ## 8. 体测系统 `scu fitness`
 
