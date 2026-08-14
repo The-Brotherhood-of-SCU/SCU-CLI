@@ -1,8 +1,13 @@
 package cli
 
 import (
+	"fmt"
+	"os"
+	"time"
+
 	"github.com/The-Brotherhood-of-SCU/SCU-CLI/internal/api"
 	"github.com/The-Brotherhood-of-SCU/SCU-CLI/internal/auth"
+	"github.com/The-Brotherhood-of-SCU/SCU-CLI/internal/ics"
 	"github.com/The-Brotherhood-of-SCU/SCU-CLI/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -69,19 +74,70 @@ var zhjwSemestersCmd = &cobra.Command{
 }
 
 var zhjwSchedulePlan string
+var zhjwScheduleICS struct{ file, startDate, campus string }
 
 var zhjwScheduleCmd = &cobra.Command{
 	Use:   "schedule",
-	Short: "获取课表（--plan 指定 planCode，如 2025-2026-2-1）",
+	Short: "获取课表（--plan 指定 planCode，如 2025-2026-2-1；--ics 导出日历文件）",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if zhjwScheduleICS.startDate != "" {
+			if _, err := time.Parse("2006-01-02", zhjwScheduleICS.startDate); err != nil {
+				return output.Fail("input", fmt.Errorf("--start-date 格式应为 YYYY-MM-DD: %v", err))
+			}
+		}
 		return runJSON(func() (interface{}, error) {
 			s, err := newZhjwService()
 			if err != nil {
 				return nil, err
 			}
-			return s.FetchSchedule(zhjwSchedulePlan)
+			raw, err := s.FetchSchedule(zhjwSchedulePlan)
+			if err != nil {
+				return nil, err
+			}
+			if zhjwScheduleICS.file == "" {
+				return raw, nil
+			}
+			return exportScheduleICS(raw, zhjwSchedulePlan, zhjwScheduleICS.startDate, zhjwScheduleICS.campus, zhjwScheduleICS.file)
 		})
 	},
+}
+
+// exportScheduleICS 课表 → ICS 文件：解析课程、匹配学期起始日（校历）、按周次展开事件。
+func exportScheduleICS(raw map[string]interface{}, planCode, startDate, campus, file string) (interface{}, error) {
+	var semStart time.Time
+	var semName string
+	var totalWeeks int
+	if startDate != "" {
+		t, _ := time.Parse("2006-01-02", startDate) // RunE 已校验格式
+		semStart = t
+	} else {
+		calendar, err := api.FetchAcademicCalendar()
+		if err != nil {
+			return nil, err
+		}
+		n, t, w, err := api.MatchSemesterStart(calendar, planCode, time.Now())
+		if err != nil {
+			return nil, err
+		}
+		semName, semStart, totalWeeks = n, t, w
+	}
+	courses := api.ParseScheduleCourses(raw)
+	events, truncated := api.BuildScheduleEvents(courses, semStart, campus)
+	if len(events) == 0 {
+		return nil, &auth.ServiceError{Msg: "课表中没有可展开的课程"}
+	}
+	if err := os.WriteFile(file, []byte(ics.Build("Course Schedule", events)), 0o644); err != nil {
+		return nil, &auth.ServiceError{Msg: "写入 ICS 文件失败: " + err.Error()}
+	}
+	return map[string]interface{}{
+		"file":           file,
+		"events":         len(events),
+		"courses":        len(courses),
+		"semester":       semName,
+		"semester_start": semStart.Format("2006-01-02"),
+		"total_weeks":    totalWeeks,
+		"truncated":      truncated,
+	}, nil
 }
 
 // ─── 成绩 / 考表 / 计划完成度 ───────────────────────────────────
@@ -105,16 +161,34 @@ var zhjwGradesCmd = &cobra.Command{
 	},
 }
 
+var zhjwExamsICSFile string
+
 var zhjwExamsCmd = &cobra.Command{
 	Use:   "exams",
-	Short: "获取考试安排（考表）",
+	Short: "获取考试安排（考表；--ics 导出日历文件）",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runJSON(func() (interface{}, error) {
 			s, err := newZhjwService()
 			if err != nil {
 				return nil, err
 			}
-			return s.FetchExamPlan()
+			exams, err := s.FetchExamPlan()
+			if err != nil {
+				return nil, err
+			}
+			if zhjwExamsICSFile == "" {
+				return exams, nil
+			}
+			events, skipped := api.BuildExamEvents(exams)
+			if len(events) == 0 {
+				return nil, &auth.ServiceError{Msg: "考表中没有可导出的考试"}
+			}
+			if err := os.WriteFile(zhjwExamsICSFile, []byte(ics.Build("Exam Schedule", events)), 0o644); err != nil {
+				return nil, &auth.ServiceError{Msg: "写入 ICS 文件失败: " + err.Error()}
+			}
+			return map[string]interface{}{
+				"file": zhjwExamsICSFile, "events": len(events), "skipped_unparseable": skipped,
+			}, nil
 		})
 	},
 }
@@ -340,19 +414,42 @@ var zhjwClassScheduleCmd = &cobra.Command{
 	},
 }
 
+var zhjwCalendarICSFile string
+
 var zhjwCalendarCmd = &cobra.Command{
 	Use:   "calendar",
-	Short: "获取校历（免认证，网络优先、失败回退本地缓存）",
+	Short: "获取校历（免认证，网络优先、失败回退本地缓存；--ics 导出日历文件）",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runJSON(func() (interface{}, error) {
-			return api.FetchAcademicCalendar()
+			calendar, err := api.FetchAcademicCalendar()
+			if err != nil {
+				return nil, err
+			}
+			if zhjwCalendarICSFile == "" {
+				return calendar, nil
+			}
+			events := api.BuildCalendarEvents(calendar)
+			if len(events) == 0 {
+				return nil, &auth.ServiceError{Msg: "校历中没有可导出的事件"}
+			}
+			if err := os.WriteFile(zhjwCalendarICSFile, []byte(ics.Build("Academic Calendar", events)), 0o644); err != nil {
+				return nil, &auth.ServiceError{Msg: "写入 ICS 文件失败: " + err.Error()}
+			}
+			return map[string]interface{}{"file": zhjwCalendarICSFile, "events": len(events)}, nil
 		})
 	},
 }
 
 func init() {
 	zhjwScheduleCmd.Flags().StringVar(&zhjwSchedulePlan, "plan", "", "学期 planCode（取自 zhjw semesters 的 value；省略取当前学期）")
+	s := zhjwScheduleCmd.Flags()
+	s.StringVar(&zhjwScheduleICS.file, "ics", "", "导出 ICS 日历到指定文件（如 --ics schedule.ics）")
+	s.StringVar(&zhjwScheduleICS.startDate, "start-date", "", "学期起始日 YYYY-MM-DD（省略则从校历自动匹配）")
+	s.StringVar(&zhjwScheduleICS.campus, "campus", "", "节次时段校区：江安 / 望江 / 华西（省略则按课程地点探测，兜底江安）")
 	zhjwGradesCmd.Flags().BoolVar(&zhjwGradesScheme, "scheme", false, "查询方案成绩而非及格成绩")
+
+	zhjwExamsCmd.Flags().StringVar(&zhjwExamsICSFile, "ics", "", "导出 ICS 日历到指定文件（如 --ics exams.ics）")
+	zhjwCalendarCmd.Flags().StringVar(&zhjwCalendarICSFile, "ics", "", "导出 ICS 日历到指定文件（如 --ics calendar.ics）")
 
 	f := zhjwClassroomTypesCmd.Flags()
 	f.StringVar(&classroomTypesArgs.campusNum, "campus-num", "", "校区编号（classroom index 的 campuses[].campusNumber）")

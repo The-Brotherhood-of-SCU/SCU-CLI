@@ -54,6 +54,7 @@ stdout 恒为单个 JSON 对象，诊断信息走 stderr：
 |---|---|
 | `week` / `semesters` / `calendar` | 当前教学周 / 学期列表 / 校历（免认证） |
 | `schedule --plan <planCode>` | 课表 |
+| `schedule/exams/calendar --ics <file>` | 导出 ICS 日历文件（课表按周次/单双周/节次展开，节次时段按校区自动探测；支持 `--start-date`、`--campus` 覆盖） |
 | `grades [--scheme]` | 及格成绩 / 方案成绩 |
 | `exams` / `completion` | 考表 / 计划完成度 |
 | `classroom index → types → query` | 空闲教室查询（逐级取校区/教学楼编号） |

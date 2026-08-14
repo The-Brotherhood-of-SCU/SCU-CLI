@@ -103,6 +103,13 @@ scu zhjw exams                         # 考表（考试安排）
 scu zhjw completion                    # 计划完成度
 scu zhjw calendar                      # 校历（免认证，网络优先、失败回退本地缓存）
 
+# ICS 日历导出（--ics 必须带文件路径值；输出 JSON 含 file/events 等元信息）
+scu zhjw schedule --plan 2025-2026-2-1 --ics schedule.ics
+#   学期起始日自动从校历匹配（planCode → 校历学期名）；匹配失败时用 --start-date 2026-03-02 手动指定
+#   节次时段按课程地点自动探测校区（江安/望江/华西），也可用 --campus 江安 强制
+scu zhjw exams --ics exams.ics         # 考表导出（日期时间无法解析的考试自动跳过，见 skipped_unparseable）
+scu zhjw calendar --ics calendar.ics   # 校历导出（全天事件，开学/假期/考试周）
+
 # 教室查询（编号链：index → types → query）
 scu zhjw classroom index               # 校区与教学楼列表（所有编号的来源）
 scu zhjw classroom types --campus-num 1 --building-num 101 --campus-name 江安 --building-name 一教A
