@@ -8,8 +8,6 @@
 npm install -g @the-brotherhood-of-scu/scu-cli   # 需要 Node.js ≥ 18
 ```
 
-自动完成两件事：下载当前平台的预编译二进制（SHA256 校验，托管于 GitHub Release）；安装 Claude Code Skill 到 `~/.claude/skills/scu-cli/`（设 `SCU_CLI_NO_SKILL=1` 可跳过）。装完用 `scu --version` 验证。
-
 无 Node 环境时，从 [Releases](https://github.com/The-Brotherhood-of-SCU/SCU-CLI/releases) 下载对应平台单二进制（linux / darwin / windows × amd64 / arm64）放入 `PATH`，或用 Go 安装：
 
 ```bash
