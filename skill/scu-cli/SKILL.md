@@ -188,7 +188,14 @@ scu ccyl export <email> <creditId...>                # 导出成绩单到邮箱
 
 完整命令树：`scu --help`；子命令细节与参数来源：`scu <组> <命令> --help`。
 
-## 10. 行为准则
+## 10. 办事大厅 `scu service`
+
+```bash
+scu service applications                    # 我的申请列表（--status 0全部/1进行中+草稿/3已完成，--page 分页，每页20条）
+#   列表项：app_name 事项名、created 提交时间、inst_status 中文状态文案（不要自己映射 status 数字）
+```
+
+## 11. 行为准则
 
 - **写操作先确认**：`ccyl signup/cancel/subscribe/unsubscribe/export`、`user offline`、`balance query` 首次绑房等写操作，执行前向用户确认目标与参数；失败后不要自动重试（CLI 自身也不会重放写请求），先把错误报给用户。
 - 只读命令可自由串行调用；优先用发现链逐级取 ID，不要向用户索要可以自动发现的编号。

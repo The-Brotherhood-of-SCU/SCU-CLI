@@ -40,4 +40,5 @@ func init() {
 	rootCmd.AddCommand(balanceCmd)
 	rootCmd.AddCommand(fitnessCmd)
 	rootCmd.AddCommand(ccylCmd)
+	rootCmd.AddCommand(serviceCmd)
 }

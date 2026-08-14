@@ -227,6 +227,14 @@ func NewFitnessAuth(scu *ScuAuth) *SsoRelayAuth {
 	return NewSsoRelayAuth(scu, "fitness", "https://pead.scu.edu.cn/bdlp_h5_fitness_test/public/index.php/index/login/scuMsLogin")
 }
 
+// NewServiceHallAuth 网上办事大厅（service.scu.edu.cn）。
+// SSO 链：/api/login/main（301）→ /site/login/cas-login → id.scu.edu.cn CAS
+// → 回跳下发 PHPSESSID(=CAS 票据)/vjuid/vjvd/vt 会话 cookie。
+func NewServiceHallAuth(scu *ScuAuth) *SsoRelayAuth {
+	return NewSsoRelayAuth(scu, "service",
+		"https://service.scu.edu.cn/api/login/main?redirect_url=https%3A%2F%2Fservice.scu.edu.cn%2Fv2%2Fmatter%2F")
+}
+
 // ─── 通用重试 ───────────────────────────────────────────────────
 
 // RetryOnUnauthenticated 对应 Bugaoshan 的 retryOnUnauthenticated：

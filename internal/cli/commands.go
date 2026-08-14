@@ -85,6 +85,13 @@ var ccylCmd = &cobra.Command{
   creditId          ← ccyl credits 输出记录`,
 }
 
+// 办事大厅命令组
+
+var serviceCmd = &cobra.Command{
+	Use:   "service",
+	Short: "网上办事大厅（我的申请 / 事项办理）",
+}
+
 func init() {
 	loginCmd.Flags().StringP("username", "u", "", "学号（省略则交互输入）")
 	loginCmd.Flags().StringP("password", "p", "", "密码（省略则交互输入，不推荐在命令行传递）")

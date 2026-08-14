@@ -92,6 +92,12 @@ stdout 恒为单个 JSON 对象，诊断信息走 stderr：
 | `subscribe` / `unsubscribe` | 预约 / 取消预约活动系列 |
 | `credits` / `export <email> <creditId...>` | 成绩单 / 导出成绩单到邮箱 |
 
+### 办事大厅 `scu service`
+
+| 命令 | 说明 |
+|---|---|
+| `applications [--status 0\|1\|3] [--page N]` | 我的申请列表（请假/报备等事项的进度，状态看 `inst_status` 字段） |
+
 ## AI Agent Skill
 
 npm 安装时已将 Skill 装入 `~/.claude/skills/scu-cli/`（Release 另附 `scu-cli-skill.zip` 供手动安装）。装好后 agent 会话中直接说"查一下我下学期的课表"即可；登录流程、参数发现链、写操作准则等细节均由 Skill 指导 agent 完成。
