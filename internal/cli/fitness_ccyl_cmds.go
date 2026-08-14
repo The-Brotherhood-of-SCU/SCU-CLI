@@ -106,6 +106,41 @@ var ccylMineCmd = &cobra.Command{
 	},
 }
 
+var ccylSubscribedName string
+
+var ccylSubscribedCmd = &cobra.Command{
+	Use:   "subscribed",
+	Short: "获取已预约的活动系列（可配合 unsubscribe 批量退订前枚举）",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runJSON(func() (interface{}, error) {
+			s, err := newCcylService()
+			if err != nil {
+				return nil, err
+			}
+			return s.GetOrderedActivities(ccylSearchArgs.page, ccylSearchArgs.size, ccylSubscribedName)
+		})
+	},
+}
+
+var ccylDictsCmd = &cobra.Command{
+	Use:   "dicts <groupCode> [groupCode...]",
+	Short: "查询数据字典（活动级别/能力类型等枚举，供 activities 的 --level/--quality 等筛选取值）",
+	Long: `按分组代码查询第二课堂数据字典，返回 {groupCode: [{code, name}]}。
+
+activities 的筛选参数（--level/--score-type/--status/--quality）合法值来自字典，
+常见 groupCode 与参数同名（如 level、quality）；单个分组查询失败会静默跳过。`,
+	Args: cobra.MinimumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runJSON(func() (interface{}, error) {
+			s, err := newCcylService()
+			if err != nil {
+				return nil, err
+			}
+			return s.QueryDicts(args)
+		})
+	},
+}
+
 var ccylOrgsCmd = &cobra.Command{
 	Use:   "orgs",
 	Short: "获取全部组织",
@@ -292,10 +327,13 @@ func init() {
 	ccylMineCmd.Flags().IntVar(&ccylSearchArgs.size, "size", 10, "每页数量")
 	ccylCreditsCmd.Flags().IntVar(&ccylSearchArgs.page, "page", 1, "页码")
 	ccylCreditsCmd.Flags().IntVar(&ccylSearchArgs.size, "size", 10, "每页数量")
+	ccylSubscribedCmd.Flags().IntVar(&ccylSearchArgs.page, "page", 1, "页码")
+	ccylSubscribedCmd.Flags().IntVar(&ccylSearchArgs.size, "size", 10, "每页数量")
+	ccylSubscribedCmd.Flags().StringVar(&ccylSubscribedName, "name", "", "活动系列名称关键词（可空）")
 
 	ccylSignUpCmd.Flags().StringVar(&ccylSignUpScoreType, "score-type", "", "能力类型 ID（score-types 输出的 id）")
 
-	ccylCmd.AddCommand(ccylActivitiesCmd, ccylMineCmd, ccylOrgsCmd, ccylDetailCmd,
+	ccylCmd.AddCommand(ccylActivitiesCmd, ccylMineCmd, ccylSubscribedCmd, ccylDictsCmd, ccylOrgsCmd, ccylDetailCmd,
 		ccylLibDetailCmd, ccylScoreTypesCmd, ccylSignUpCmd, ccylCancelCmd,
 		ccylSubscribeCmd, ccylUnsubscribeCmd, ccylCreditsCmd, ccylExportCmd)
 }

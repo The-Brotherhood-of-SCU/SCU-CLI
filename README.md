@@ -85,7 +85,8 @@ stdout 恒为单个 JSON 对象，诊断信息走 stderr：
 
 | 命令 | 说明 |
 |---|---|
-| `activities` / `mine` / `orgs` | 搜索活动库 / 我参与的 / 组织列表 |
+| `activities` / `mine` / `subscribed` / `orgs` | 搜索活动库 / 我参与的 / 已预约的活动系列 / 组织列表 |
+| `dicts <groupCode...>` | 数据字典（activities 筛选参数的合法枚举来源） |
 | `lib-detail → detail` | 活动系列详情 → 场次活动详情 |
 | `score-types → signup` / `cancel` | 报名（需能力类型 id）/ 取消报名 |
 | `subscribe` / `unsubscribe` | 预约 / 取消预约活动系列 |

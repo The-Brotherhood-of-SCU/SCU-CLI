@@ -161,6 +161,39 @@ func (s *CcylService) GetMyActivities(pageNum, pageSize int) ([]interface{}, err
 	return listField(json, "content"), nil
 }
 
+// GetOrderedActivities 获取已预约的活动系列列表（与 mine 不同：取值路径是 list）。
+func (s *CcylService) GetOrderedActivities(pageNum, pageSize int, name string) ([]interface{}, error) {
+	json, err := s.post("list-ordered-activity-library", "/app/activity/list-ordered-activity-library", map[string]interface{}{
+		"pn": pageNum, "time": millis(), "ps": pageSize, "name": name,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := requireSuccess(json, "获取预约的活动失败"); err != nil {
+		return nil, err
+	}
+	return listField(json, "list"), nil
+}
+
+// QueryDicts 按分组代码查询数据字典（[{code, name, groupCode}]）。
+// 单个分组业务失败（code!=0）静默跳过（与 App 一致）；传输/认证错误上抛。
+func (s *CcylService) QueryDicts(groupCodes []string) (map[string]interface{}, error) {
+	out := map[string]interface{}{}
+	for _, code := range groupCodes {
+		json, err := s.post("query-by-group-code", "/app/dict/query-by-group-code", map[string]interface{}{
+			"groupCode": code,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if c, ok := json["code"].(float64); !ok || int(c) != 0 {
+			continue
+		}
+		out[code] = listField(json, "list")
+	}
+	return out, nil
+}
+
 // GetAllOrgs 获取全部组织。
 func (s *CcylService) GetAllOrgs() ([]interface{}, error) {
 	json, err := s.post("list-all", "/app/org/list-all", map[string]interface{}{})

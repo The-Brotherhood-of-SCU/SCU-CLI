@@ -172,6 +172,8 @@ ID 发现链：`activities`（→ `activityLibraryId`）→ `lib-detail`（→ `
 scu ccyl activities --name 讲座 --page 1 --size 10   # 搜索活动库，记录的 id = activityLibraryId
 #   可选筛选：--level --score-type --org --order --status --quality
 scu ccyl mine                                        # 我参与的活动（--page/--size）
+scu ccyl subscribed                                  # 已预约的活动系列（--name/--page/--size）
+scu ccyl dicts <groupCode...>                        # 数据字典（activities 筛选参数的合法枚举来源，如 level/quality）
 scu ccyl orgs                                        # 组织列表
 scu ccyl lib-detail <activityLibraryId>              # 活动系列详情，含场次活动 id = activityId
 scu ccyl detail <activityId>                         # 活动详情
