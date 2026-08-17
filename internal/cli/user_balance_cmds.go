@@ -164,6 +164,9 @@ var balanceQueryCmd = &cobra.Command{
 绑定后可直接查询（使用已绑定的房间）：
   scu balance query --type 1`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if balanceQueryArgs.type_ != 1 && balanceQueryArgs.type_ != 2 {
+			return output.Fail("input", fmt.Errorf("--type 只支持 1（照明电费）/ 2（空调电费）"))
+		}
 		return runJSON(func() (interface{}, error) {
 			scu, err := newScuAuth()
 			if err != nil {

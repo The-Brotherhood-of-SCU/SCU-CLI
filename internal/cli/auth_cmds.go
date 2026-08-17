@@ -106,6 +106,9 @@ func runLogin(cmd *cobra.Command) error {
 	}
 
 	// 模式一：调用方已提供验证码（AI 两步登录）。
+	if (loginCaptchaCode != "") != (loginCaptchaText != "") {
+		return output.Fail("input", errors.New("--captcha-code 与 --captcha-text 必须同时提供"))
+	}
 	if loginCaptchaCode != "" && loginCaptchaText != "" {
 		if err := a.Login(username, password, loginCaptchaCode, loginCaptchaText); err != nil {
 			return output.Fail("login", err)

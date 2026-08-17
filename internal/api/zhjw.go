@@ -78,6 +78,50 @@ func parseJSON(body string, api string, out interface{}) error {
 	return nil
 }
 
+// zhjwGet 发起 GET 并做统一会话过期检查，返回 TrimSpace 后的 body。
+func zhjwGet(c *auth.CookieClient, url string, headers map[string]string) (string, error) {
+	resp, err := c.Get(url, headers)
+	if err != nil {
+		return "", err
+	}
+	body := strings.TrimSpace(string(resp.Body))
+	if err := checkZhjwSessionExpiry(body, resp.StatusCode); err != nil {
+		return "", err
+	}
+	return body, nil
+}
+
+// zhjwPost 发起表单 POST 并做统一会话过期检查，返回 TrimSpace 后的 body。
+func zhjwPost(c *auth.CookieClient, url string, headers map[string]string, form url.Values) (string, error) {
+	resp, err := c.PostForm(url, headers, form)
+	if err != nil {
+		return "", err
+	}
+	body := strings.TrimSpace(string(resp.Body))
+	if err := checkZhjwSessionExpiry(body, resp.StatusCode); err != nil {
+		return "", err
+	}
+	return body, nil
+}
+
+// zhjwGetJSON 是 zhjwGet + parseJSON 的组合。
+func zhjwGetJSON(c *auth.CookieClient, url, api string, headers map[string]string, out interface{}) error {
+	body, err := zhjwGet(c, url, headers)
+	if err != nil {
+		return err
+	}
+	return parseJSON(body, api, out)
+}
+
+// zhjwPostJSON 是 zhjwPost + parseJSON 的组合。
+func zhjwPostJSON(c *auth.CookieClient, url, api string, headers map[string]string, form url.Values, out interface{}) error {
+	body, err := zhjwPost(c, url, headers, form)
+	if err != nil {
+		return err
+	}
+	return parseJSON(body, api, out)
+}
+
 // ─── 课表 ────────────────────────────────────────────────────────
 
 var weekRegexp = regexp.MustCompile(`第(\d+)周`)
@@ -85,12 +129,8 @@ var weekRegexp = regexp.MustCompile(`第(\d+)周`)
 // FetchCurrentWeek 获取当前教学周数；假期返回 (0, true, nil)。
 func (s *ZhjwService) FetchCurrentWeek() (week int, onVacation bool, err error) {
 	v, err := s.request(func(c *auth.CookieClient) (interface{}, error) {
-		resp, err := c.Get(zbase+"/", zhtmlHeaders)
+		body, err := zhjwGet(c, zbase+"/", zhtmlHeaders)
 		if err != nil {
-			return nil, err
-		}
-		body := strings.TrimSpace(string(resp.Body))
-		if err := checkZhjwSessionExpiry(body, resp.StatusCode); err != nil {
 			return nil, err
 		}
 		if m := weekRegexp.FindStringSubmatch(body); m != nil {
@@ -118,12 +158,8 @@ var htmlTagRegexp = regexp.MustCompile(`<[^>]+>`)
 // FetchSemesters 获取历年学期列表（value 为 planCode，如 2025-2026-2-1）。
 func (s *ZhjwService) FetchSemesters() ([]Option, error) {
 	v, err := s.request(func(c *auth.CookieClient) (interface{}, error) {
-		resp, err := c.Get(zbase+"/student/courseSelect/calendarSemesterCurriculum/index", zhtmlHeaders)
+		body, err := zhjwGet(c, zbase+"/student/courseSelect/calendarSemesterCurriculum/index", zhtmlHeaders)
 		if err != nil {
-			return nil, err
-		}
-		body := strings.TrimSpace(string(resp.Body))
-		if err := checkZhjwSessionExpiry(body, resp.StatusCode); err != nil {
 			return nil, err
 		}
 		var semesters []Option
@@ -147,17 +183,9 @@ func (s *ZhjwService) FetchSemesters() ([]Option, error) {
 // FetchSchedule 获取指定学期课表原始 JSON（planCode 如 2025-2026-2-1）。
 func (s *ZhjwService) FetchSchedule(planCode string) (map[string]interface{}, error) {
 	v, err := s.request(func(c *auth.CookieClient) (interface{}, error) {
-		resp, err := c.PostForm(zbase+"/student/courseSelect/thisSemesterCurriculum/ajaxStudentSchedule/callback",
-			zajaxHeaders, url.Values{"planCode": {planCode}})
-		if err != nil {
-			return nil, err
-		}
-		body := strings.TrimSpace(string(resp.Body))
-		if err := checkZhjwSessionExpiry(body, resp.StatusCode); err != nil {
-			return nil, err
-		}
 		var out map[string]interface{}
-		if err := parseJSON(body, "jwxt/schedule", &out); err != nil {
+		if err := zhjwPostJSON(c, zbase+"/student/courseSelect/thisSemesterCurriculum/ajaxStudentSchedule/callback",
+			"jwxt/schedule", zajaxHeaders, url.Values{"planCode": {planCode}}, &out); err != nil {
 			return nil, err
 		}
 		return out, nil
@@ -175,16 +203,12 @@ func (s *ZhjwService) fetchScoresTwoStep(kind string) (map[string]interface{}, e
 	indexPath := zbase + "/student/integratedQuery/scoreQuery/" + kind + "/index"
 	callbackRe := regexp.MustCompile(`var\s+url\s*=\s*"(/student/integratedQuery/scoreQuery/[^/]+/` + kind + `/callback)"`)
 	v, err := s.request(func(c *auth.CookieClient) (interface{}, error) {
-		indexResp, err := c.Get(indexPath, map[string]string{
+		indexBody, err := zhjwGet(c, indexPath, map[string]string{
 			"Accept":     "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
 			"Referer":    zbase + "/",
 			"User-Agent": auth.DefaultUserAgent,
 		})
 		if err != nil {
-			return nil, err
-		}
-		indexBody := string(indexResp.Body)
-		if err := checkZhjwSessionExpiry(indexBody, indexResp.StatusCode); err != nil {
 			return nil, err
 		}
 		m := callbackRe.FindStringSubmatch(indexBody)
@@ -194,20 +218,12 @@ func (s *ZhjwService) fetchScoresTwoStep(kind string) (map[string]interface{}, e
 			}
 			return nil, &auth.ServiceError{Msg: "无法从页面提取 " + kind + " callback URL"}
 		}
-		callbackResp, err := c.Get(zbase+m[1], map[string]string{
+		var out map[string]interface{}
+		if err := zhjwGetJSON(c, zbase+m[1], kind+"/callback", map[string]string{
 			"Accept":     "application/json, text/plain, */*",
 			"Referer":    indexPath,
 			"User-Agent": auth.DefaultUserAgent,
-		})
-		if err != nil {
-			return nil, err
-		}
-		body := strings.TrimSpace(string(callbackResp.Body))
-		if err := checkZhjwSessionExpiry(body, callbackResp.StatusCode); err != nil {
-			return nil, err
-		}
-		var out map[string]interface{}
-		if err := parseJSON(body, kind+"/callback", &out); err != nil {
+		}, &out); err != nil {
 			return nil, err
 		}
 		return out, nil
@@ -254,16 +270,12 @@ func firstSubmatch(re *regexp.Regexp, s string) string {
 // FetchExamPlan 获取考试安排列表（解析考表 HTML 卡片）。
 func (s *ZhjwService) FetchExamPlan() ([]ExamInfo, error) {
 	v, err := s.request(func(c *auth.CookieClient) (interface{}, error) {
-		resp, err := c.Get(zbase+"/student/examinationManagement/examPlan/index", map[string]string{
+		body, err := zhjwGet(c, zbase+"/student/examinationManagement/examPlan/index", map[string]string{
 			"Accept":     "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
 			"Referer":    zbase + "/",
 			"User-Agent": auth.DefaultUserAgent,
 		})
 		if err != nil {
-			return nil, err
-		}
-		body := strings.TrimSpace(string(resp.Body))
-		if err := checkZhjwSessionExpiry(body, resp.StatusCode); err != nil {
 			return nil, err
 		}
 		var exams []ExamInfo
@@ -319,12 +331,8 @@ func extractHiddenInputJSON(body, id string) (string, error) {
 // FetchClassroomIndex 获取校区与教学楼列表（原始 JSON 数组）。
 func (s *ZhjwService) FetchClassroomIndex() (map[string]interface{}, error) {
 	v, err := s.request(func(c *auth.CookieClient) (interface{}, error) {
-		resp, err := c.Get(zbase+"/student/teachingResources/classroomUseStatus/index", zhtmlHeaders)
+		body, err := zhjwGet(c, zbase+"/student/teachingResources/classroomUseStatus/index", zhtmlHeaders)
 		if err != nil {
-			return nil, err
-		}
-		body := strings.TrimSpace(string(resp.Body))
-		if err := checkZhjwSessionExpiry(body, resp.StatusCode); err != nil {
 			return nil, err
 		}
 		xq, err := extractHiddenInputJSON(body, "xqList")
@@ -355,12 +363,8 @@ func (s *ZhjwService) FetchClassroomTypes(campusNumber, buildingNumber, campusNa
 	path := fmt.Sprintf("%s/student/teachingResources/classroomUseStatus/%s/%s/%s/%s",
 		zbase, campusNumber, buildingNumber, url.QueryEscape(campusName), url.QueryEscape(buildingName))
 	v, err := s.request(func(c *auth.CookieClient) (interface{}, error) {
-		resp, err := c.Get(path, zhtmlHeaders)
+		body, err := zhjwGet(c, path, zhtmlHeaders)
 		if err != nil {
-			return nil, err
-		}
-		body := strings.TrimSpace(string(resp.Body))
-		if err := checkZhjwSessionExpiry(body, resp.StatusCode); err != nil {
 			return nil, err
 		}
 		raw, err := extractHiddenInputJSON(body, "classroomTypes")
@@ -391,16 +395,9 @@ func (s *ZhjwService) FetchClassroomAvailability(campusNumber, buildingNumber, c
 		"searchDate": {searchDate},
 	}
 	v, err := s.request(func(c *auth.CookieClient) (interface{}, error) {
-		resp, err := c.PostForm(zbase+"/student/teachingResources/classroomUseStatus/jasInfo", zajaxHeaders, form)
-		if err != nil {
-			return nil, err
-		}
-		body := strings.TrimSpace(string(resp.Body))
-		if err := checkZhjwSessionExpiry(body, resp.StatusCode); err != nil {
-			return nil, err
-		}
 		var out map[string]interface{}
-		if err := parseJSON(body, "classroomUseStatus/jasInfo", &out); err != nil {
+		if err := zhjwPostJSON(c, zbase+"/student/teachingResources/classroomUseStatus/jasInfo",
+			"classroomUseStatus/jasInfo", zajaxHeaders, form, &out); err != nil {
 			return nil, err
 		}
 		return out, nil
@@ -435,14 +432,7 @@ func parseSelectOptions(body, selectName string) []Option {
 
 func (s *ZhjwService) fetchTrainProgramIndex() (string, error) {
 	v, err := s.request(func(c *auth.CookieClient) (interface{}, error) {
-		resp, err := c.Get(zbase+"/student/comprehensiveQuery/search/trainProgram/index", zhtmlHeaders)
-		if err != nil {
-			return nil, err
-		}
-		if err := checkZhjwSessionExpiry(string(resp.Body), resp.StatusCode); err != nil {
-			return nil, err
-		}
-		return string(resp.Body), nil
+		return zhjwGet(c, zbase+"/student/comprehensiveQuery/search/trainProgram/index", zhtmlHeaders)
 	})
 	if err != nil {
 		return "", err
@@ -482,20 +472,13 @@ func (s *ZhjwService) SearchPrograms(college, grade string) ([]interface{}, erro
 		"xdlx": {"00001"}, "xsh": {college}, "pageNum": {"1"}, "pageSize": {"100"},
 	}
 	v, err := s.request(func(c *auth.CookieClient) (interface{}, error) {
-		resp, err := c.PostForm(zbase+"/student/comprehensiveQuery/search/trainProgram/load", trainProgramFormHeaders, form)
-		if err != nil {
-			return nil, err
-		}
-		body := strings.TrimSpace(string(resp.Body))
-		if err := checkZhjwSessionExpiry(body, resp.StatusCode); err != nil {
-			return nil, err
-		}
 		var out struct {
 			Data struct {
 				Records []interface{} `json:"records"`
 			} `json:"data"`
 		}
-		if err := parseJSON(body, "trainProgram/load", &out); err != nil {
+		if err := zhjwPostJSON(c, zbase+"/student/comprehensiveQuery/search/trainProgram/load",
+			"trainProgram/load", trainProgramFormHeaders, form, &out); err != nil {
 			return nil, err
 		}
 		if out.Data.Records == nil {
@@ -513,16 +496,9 @@ func (s *ZhjwService) SearchPrograms(college, grade string) ([]interface{}, erro
 func (s *ZhjwService) FetchProgramDetail(fajhh string) (map[string]interface{}, error) {
 	form := url.Values{"fajhh": {fajhh}, "lx": {"1"}}
 	v, err := s.request(func(c *auth.CookieClient) (interface{}, error) {
-		resp, err := c.PostForm(zbase+"/student/comprehensiveQuery/search/trainProgram/detail", trainProgramFormHeaders, form)
-		if err != nil {
-			return nil, err
-		}
-		body := strings.TrimSpace(string(resp.Body))
-		if err := checkZhjwSessionExpiry(body, resp.StatusCode); err != nil {
-			return nil, err
-		}
 		var out map[string]interface{}
-		if err := parseJSON(body, "trainProgram/detail", &out); err != nil {
+		if err := zhjwPostJSON(c, zbase+"/student/comprehensiveQuery/search/trainProgram/detail",
+			"trainProgram/detail", trainProgramFormHeaders, form, &out); err != nil {
 			return nil, err
 		}
 		return out, nil
@@ -536,20 +512,12 @@ func (s *ZhjwService) FetchProgramDetail(fajhh string) (map[string]interface{}, 
 // FetchCourseDetail 获取课程详情（urlPath 来自方案详情 treeList 节点）。
 func (s *ZhjwService) FetchCourseDetail(urlPath string) (map[string]interface{}, error) {
 	v, err := s.request(func(c *auth.CookieClient) (interface{}, error) {
-		resp, err := c.Get(zbase+urlPath, map[string]string{
+		var out map[string]interface{}
+		if err := zhjwGetJSON(c, zbase+urlPath, "courseDetail", map[string]string{
 			"Accept":     "application/json, */*",
 			"Referer":    zbase + "/student/comprehensiveQuery/search/trainProgram/index",
 			"User-Agent": auth.DefaultUserAgent,
-		})
-		if err != nil {
-			return nil, err
-		}
-		body := strings.TrimSpace(string(resp.Body))
-		if err := checkZhjwSessionExpiry(body, resp.StatusCode); err != nil {
-			return nil, err
-		}
-		var out map[string]interface{}
-		if err := parseJSON(body, "courseDetail", &out); err != nil {
+		}, &out); err != nil {
 			return nil, err
 		}
 		return out, nil
@@ -576,6 +544,13 @@ func (s *ZhjwService) FetchPlanCompletion() ([]interface{}, error) {
 			return nil, &auth.RateLimitedError{Msg: "教务系统限流：请勿频繁刷新"}
 		}
 		trimmed := strings.TrimSpace(body)
+		// 302 / 空 body 是会话过期（CookieClient 不自动跟随重定向），
+		// 不能落入下方 m == nil 分支静默返回空列表。
+		if resp.StatusCode == 302 || trimmed == "" {
+			return nil, &auth.UnauthenticatedError{Msg: "教务 session 已过期"}
+		}
+		// 正常的完成度页本身是 HTML（含 zNodes），只有"是 HTML 但不含
+		// zNodes"才判定为登录页，不能用 checkZhjwSessionExpiry。
 		if strings.HasPrefix(trimmed, "<") && !strings.Contains(body, "zNodes") {
 			return nil, &auth.UnauthenticatedError{Msg: "教务 session 已过期"}
 		}
@@ -600,12 +575,8 @@ func (s *ZhjwService) FetchPlanCompletion() ([]interface{}, error) {
 // FetchClassScheduleInquiryIndex 获取班级课表筛选选项（学期/年级/院系）。
 func (s *ZhjwService) FetchClassScheduleInquiryIndex() (map[string]interface{}, error) {
 	v, err := s.request(func(c *auth.CookieClient) (interface{}, error) {
-		resp, err := c.Get(zbase+"/student/teachingResources/classCurriculum/index", zhtmlHeaders)
+		body, err := zhjwGet(c, zbase+"/student/teachingResources/classCurriculum/index", zhtmlHeaders)
 		if err != nil {
-			return nil, err
-		}
-		body := strings.TrimSpace(string(resp.Body))
-		if err := checkZhjwSessionExpiry(body, resp.StatusCode); err != nil {
 			return nil, err
 		}
 		return map[string]interface{}{
@@ -631,16 +602,8 @@ var classAjaxHeaders = map[string]string{
 func (s *ZhjwService) FetchSubjectsByDepartment(departmentNum string) ([]interface{}, error) {
 	u := zbase + "/student/teachingResources/gradeAndClassCurriculum/subjectJson?departmentNum=" + url.QueryEscape(departmentNum)
 	v, err := s.request(func(c *auth.CookieClient) (interface{}, error) {
-		resp, err := c.Get(u, classAjaxHeaders)
-		if err != nil {
-			return nil, err
-		}
-		body := strings.TrimSpace(string(resp.Body))
-		if err := checkZhjwSessionExpiry(body, resp.StatusCode); err != nil {
-			return nil, err
-		}
 		var out []interface{}
-		if err := parseJSON(body, "subjectJson", &out); err != nil {
+		if err := zhjwGetJSON(c, u, "subjectJson", classAjaxHeaders, &out); err != nil {
 			return nil, err
 		}
 		return out, nil
@@ -658,16 +621,8 @@ func (s *ZhjwService) FetchClassOptions(yearNum, departmentNum, subjectNum strin
 		"&subjectNum=" + url.QueryEscape(subjectNum) +
 		"&yearNum=" + url.QueryEscape(yearNum)
 	v, err := s.request(func(c *auth.CookieClient) (interface{}, error) {
-		resp, err := c.Get(u, classAjaxHeaders)
-		if err != nil {
-			return nil, err
-		}
-		body := strings.TrimSpace(string(resp.Body))
-		if err := checkZhjwSessionExpiry(body, resp.StatusCode); err != nil {
-			return nil, err
-		}
 		var out []interface{}
-		if err := parseJSON(body, "classJson", &out); err != nil {
+		if err := zhjwGetJSON(c, u, "classJson", classAjaxHeaders, &out); err != nil {
 			return nil, err
 		}
 		return out, nil
@@ -697,16 +652,9 @@ func (s *ZhjwService) FetchClassList(pageNum, pageSize int, planNum, yearNum, de
 		"X-Requested-With": "XMLHttpRequest",
 	}
 	v, err := s.request(func(c *auth.CookieClient) (interface{}, error) {
-		resp, err := c.PostForm(zbase+"/student/teachingResources/classCurriculum/search", headers, form)
-		if err != nil {
-			return nil, err
-		}
-		body := strings.TrimSpace(string(resp.Body))
-		if err := checkZhjwSessionExpiry(body, resp.StatusCode); err != nil {
-			return nil, err
-		}
 		var arr []map[string]interface{}
-		if err := parseJSON(body, "classCurriculum/search", &arr); err != nil {
+		if err := zhjwPostJSON(c, zbase+"/student/teachingResources/classCurriculum/search",
+			"classCurriculum/search", headers, form, &arr); err != nil {
 			return nil, err
 		}
 		if len(arr) == 0 {
@@ -735,22 +683,19 @@ func (s *ZhjwService) FetchClassSchedule(planCode, classCode string) ([]interfac
 	u := zbase + "/student/teachingResources/classCurriculum/searchCurriculumInfo/callback" +
 		"?planCode=" + url.QueryEscape(planCode) + "&classCode=" + url.QueryEscape(classCode)
 	v, err := s.request(func(c *auth.CookieClient) (interface{}, error) {
-		resp, err := c.Get(u, classAjaxHeaders)
-		if err != nil {
-			return nil, err
-		}
-		body := strings.TrimSpace(string(resp.Body))
-		if err := checkZhjwSessionExpiry(body, resp.StatusCode); err != nil {
-			return nil, err
-		}
 		var arr []interface{}
-		if err := parseJSON(body, "searchCurriculumInfo/callback", &arr); err != nil {
+		if err := zhjwGetJSON(c, u, "searchCurriculumInfo/callback", classAjaxHeaders, &arr); err != nil {
 			return nil, err
 		}
 		if len(arr) == 0 {
 			return []interface{}{}, nil
 		}
-		return arr[0], nil
+		// 服务端正常返回 [[...]]；shape 偏离时给出结构化错误而非 panic。
+		list, ok := arr[0].([]interface{})
+		if !ok {
+			return nil, &auth.ServiceError{Msg: "[searchCurriculumInfo/callback] 响应格式异常：首元素不是数组"}
+		}
+		return list, nil
 	})
 	if err != nil {
 		return nil, err

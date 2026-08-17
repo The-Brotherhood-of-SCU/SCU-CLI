@@ -2,6 +2,7 @@
 package cli
 
 import (
+	"github.com/The-Brotherhood-of-SCU/SCU-CLI/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -29,9 +30,14 @@ var rootCmd = &cobra.Command{
 	SilenceErrors: true,
 }
 
-// Execute 运行根命令。
+// Execute 运行根命令。RunE 之外的错误（参数数量校验、flag 解析、未知命令）
+// 没有经过 output.Fail，这里补写失败包层，保证 stdout 恒为 JSON。
 func Execute() error {
-	return rootCmd.Execute()
+	err := rootCmd.Execute()
+	if err != nil && !output.IsReported(err) {
+		return output.Fail("input", err)
+	}
+	return err
 }
 
 func init() {

@@ -10,6 +10,7 @@ package output
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 )
@@ -32,10 +33,23 @@ func JSON(data interface{}) error {
 	return write(Envelope{OK: true, Data: data})
 }
 
+// reportedError 标记已经写过失败包层的错误，供调用方（如 cli.Execute）
+// 识别，避免对同一错误重复输出包层。
+type reportedError struct{ err error }
+
+func (e *reportedError) Error() string { return e.err.Error() }
+func (e *reportedError) Unwrap() error { return e.err }
+
+// IsReported 判断错误是否已通过 Fail 写过失败包层。
+func IsReported(err error) bool {
+	var re *reportedError
+	return errors.As(err, &re)
+}
+
 // Fail 将错误以失败包层输出到 stdout（保持机器可读），并返回非零退出语义的 error。
 func Fail(kind string, err error) error {
 	_ = write(Envelope{OK: false, Error: &ErrInfo{Kind: kind, Message: err.Error()}})
-	return err
+	return &reportedError{err}
 }
 
 func write(e Envelope) error {

@@ -788,7 +788,9 @@ type FormState struct {
 	Values map[string]interface{}
 }
 
-// NewFormState 构造并从服务端预填播种（calendar 字符串宽容解析；空串不播种）。
+// NewFormState 构造并从服务端预填播种（calendar 字符串宽容解析；空串不播种；
+// checkbox/file 的预填值从 JSON 解码的 []interface{} 归一化为具体类型，
+// 否则下游 isEmptyValue/序列化的类型断言会静默失败）。
 func NewFormState(schema *FormSchema) *FormState {
 	st := &FormState{Schema: schema, Values: map[string]interface{}{}}
 	for k, v := range schema.Data {
@@ -796,11 +798,41 @@ func NewFormState(schema *FormSchema) *FormState {
 			continue
 		}
 		p := schema.PluginByKey(k)
-		if p != nil && p.Type == FieldCalendar {
-			if parsed := parseServiceDateTime(v); parsed != nil {
-				st.Values[k] = *parsed
+		if p != nil {
+			switch p.Type {
+			case FieldCalendar:
+				if parsed := parseServiceDateTime(v); parsed != nil {
+					st.Values[k] = *parsed
+				}
+				continue
+			case FieldCheckbox:
+				if list, ok := v.([]interface{}); ok {
+					ss := make([]string, 0, len(list))
+					for _, item := range list {
+						if s, ok := item.(string); ok {
+							ss = append(ss, s)
+						}
+					}
+					st.Values[k] = ss
+					continue
+				}
+			case FieldFile:
+				if list, ok := v.([]interface{}); ok {
+					atts := make([]ServiceAttachment, 0, len(list))
+					for _, item := range list {
+						m, ok := item.(map[string]interface{})
+						if !ok {
+							continue
+						}
+						name, _ := m["name"].(string)
+						u, _ := m["url"].(string)
+						id, _ := m["id"].(string)
+						atts = append(atts, ServiceAttachment{Name: name, URL: u, ID: id})
+					}
+					st.Values[k] = atts
+					continue
+				}
 			}
-			continue
 		}
 		if s, ok := v.(string); ok && s == "" {
 			continue
@@ -950,6 +982,9 @@ func (st *FormState) hasValue(p ServicePlugin, v interface{}) bool { return !st.
 func (st *FormState) BuildFormFields() map[string]interface{} {
 	result := map[string]interface{}{}
 	var omitted []string
+	// DataSource 配对字段写入收集到循环结束后统一应用：遍历 Auth map 的
+	// 顺序随机，直接写入可能被目标字段自身的分支（如隐藏占位）覆盖。
+	pairWrites := map[string]string{}
 
 	for key := range st.Schema.Auth {
 		p := st.Schema.PluginByKey(key)
@@ -978,7 +1013,7 @@ func (st *FormState) BuildFormFields() map[string]interface{} {
 			}
 			result[key] = map[string]interface{}{"list": name}
 			if p != nil && p.DataSource != nil && p.DataSource.ResultKey != "" && !p.DataSource.IsSetPlugin() {
-				result[p.DataSource.ResultKey] = name
+				pairWrites[p.DataSource.ResultKey] = name
 			}
 			continue
 		}
@@ -1005,6 +1040,9 @@ func (st *FormState) BuildFormFields() map[string]interface{} {
 		result[key] = serializeServiceFieldValue(*p, v)
 	}
 
+	for k, v := range pairWrites {
+		result[k] = v
+	}
 	for _, k := range omitted {
 		delete(result, k)
 	}

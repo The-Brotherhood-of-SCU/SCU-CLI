@@ -4,6 +4,22 @@
 
 发布流程：推送 `vX.Y.Z` 标签触发 GitHub Action，自动从本文件提取对应版本章节作为 Release 说明，并在 Release 完成后通过 OIDC Trusted Publishing 将包发布到 npm（无需长期 token）、通过 SkillHub CLI 同步发布 Agent Skill（需配置 Secret `SKILLHUB_KEY`，未配置则跳过）。
 
+## [0.4.0] - 2026-08-17
+
+### 修复
+
+- 教务：`completion`（计划完成度）在 session 过期（302/空响应）时不再静默返回空列表，正确触发自动重登
+- 教务：`class schedule` 在服务端返回 shape 偏离 `[[...]]` 时返回结构化错误而非 panic
+- 输出契约：参数数量/flag 解析/未知命令等 cobra 层错误现在也向 stdout 写 `{"ok":false,"error":{"kind":"input",...}}` 包层（此前 stdout 为空）
+- 办事大厅：服务端预填的 checkbox/file 字段值不再被静默丢弃（预填必填 checkbox 此前会被误判为空）
+- 办事大厅：DataSource 配对字段写入改为循环后统一应用，修复结果依赖 map 迭代顺序导致的输出不确定（`TestApplyDataSourceValueResultKeyPair` 此前间歇性失败）
+- `login` 只提供 `--captcha-code`/`--captcha-text` 之一时报 `kind=input`，不再静默忽略
+- `balance query --type` 校验取值 1/2，与 `balance trend` 一致
+
+### 重构
+
+- `internal/api/zhjw.go`：请求 → 会话过期检查 → JSON 解析的重复样板（11 处）收敛为 `zhjwGet/zhjwPost/zhjwGetJSON/zhjwPostJSON`
+
 ## [0.3.0] - 2026-08-14
 
 功能全面对齐校园生活助手 App [Bugaoshan](https://github.com/The-Brotherhood-of-SCU/Bugaoshan)，本轮补齐 9 项差距；README 重写为面向 AI 的安装与功能速查。
