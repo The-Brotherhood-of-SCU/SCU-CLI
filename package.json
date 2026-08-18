@@ -1,6 +1,6 @@
 {
   "name": "@the-brotherhood-of-scu/scu-cli",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "四川大学校园服务命令行工具（教务/微服务/缴费/体测/第二课堂），面向 AI 代理与脚本设计",
   "bin": {
     "scu": "bin/scu.js"

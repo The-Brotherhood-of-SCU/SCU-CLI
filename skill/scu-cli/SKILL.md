@@ -3,7 +3,7 @@ name: scu-cli
 description: 使用 scu CLI 操作四川大学校园服务（教务课表/成绩/考表/教室/培养方案/校历、电费余额、体测成绩、第二课堂活动/报名/学分等）。当用户是四川大学学生或教职工，需要查询或操作校园服务时使用。需要先安装 scu 二进制并完成统一认证登录。
 slug: scu-cli
 displayName: 四川大学校园服务 CLI
-version: 0.4.0
+version: 0.4.1
 summary: 四川大学校园服务命令行 Skill——教务课表/成绩/考表/校历（支持 ICS 导出）、电费余额与消耗趋势、体测成绩、第二课堂活动/报名/学分、办事大厅事项查询与动态表单提交。
 license: AGPL-3.0-only
 tags:

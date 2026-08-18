@@ -4,6 +4,12 @@
 
 发布流程：推送 `vX.Y.Z` 标签触发 GitHub Action，自动从本文件提取对应版本章节作为 Release 说明，并在 Release 完成后通过 OIDC Trusted Publishing 将包发布到 npm（无需长期 token）、通过 SkillHub CLI 同步发布 Agent Skill（需配置 Secret `SKILLHUB_KEY`，未配置则跳过）。
 
+## [0.4.1] - 2026-08-18
+
+### 重构
+
+- 移除自动识别验证码的日志输出
+
 ## [0.4.0] - 2026-08-17
 
 ### 修复
