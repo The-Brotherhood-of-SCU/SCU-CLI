@@ -65,7 +65,6 @@ func interactiveCaptchaSolver(c *auth.Captcha) (string, error) {
 // solveCaptchaWithOCR 优先本地 OCR，失败时在 TTY 下回退人工识别。
 func solveCaptchaWithOCR(c *auth.Captcha) (string, error) {
 	if text, err := ocr.RecognizeBase64(c.ImageBase64); err == nil && text != "" {
-		output.Info("OCR 识别验证码: %s", text)
 		return text, nil
 	}
 	if !term.IsTerminal(int(os.Stdin.Fd())) {
