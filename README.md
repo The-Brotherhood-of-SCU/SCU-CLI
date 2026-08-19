@@ -4,6 +4,16 @@
 
 ## 安装
 
+### 快速安装
+
+推荐发给Agent一键安装prompt(完整指导skill):
+
+```
+请根据 https://skillhub.cn/install/skillhub.md，安装 @user_611f6f00/scu-cli。
+```
+
+### 手动安装
+
 ```bash
 npm install -g @the-brotherhood-of-scu/scu-cli   # 需要 Node.js ≥ 18
 ```
@@ -34,7 +44,7 @@ stdout 恒为单个 JSON 对象，诊断信息走 stderr：
 
 失败时退出码非 0。`error.kind`：`unauthenticated`（重新 `scu login`）、`login`（登录阶段错误）、`service`（服务端/网络错误）、`config` / `input`（本地输入错误）。
 
-## 功能一览
+## 功能一览(详情请查看skill)
 
 编号类参数（planCode、校区/教学楼/学院/房间 code 等）全部由对应的发现命令逐级提供，不用猜；各命令 `--help` 标明来源。完整参数文档见 Skill（`skill/scu-cli/SKILL.md`，npm 安装时已自动安装）。
 
@@ -98,10 +108,6 @@ stdout 恒为单个 JSON 对象，诊断信息走 stderr：
 | `applications [--status 0\|1\|3] [--page N]` | 我的申请列表（请假/报备等事项的进度，状态看 `inst_status` 字段） |
 | `form <app_id>` | 查看事项表单结构（字段 key/类型/选项/必填/预填值/日期校验） |
 | `submit <app_id> --fields '<json>' [--attach Key=path] [--dry-run]` | 动态表单提交（选项/日期/省市区/附件类型感知，ShowHide 显隐与必填本地校验，先 `--dry-run` 预览提交体） |
-
-## AI Agent Skill
-
-npm 安装时已将 Skill 装入 `~/.claude/skills/scu-cli/`（Release 另附 `scu-cli-skill.zip` 供手动安装；发布时同步上架 [SkillHub](https://www.skillhub.cn)，slug `scu-cli`）。装好后 agent 会话中直接说"查一下我下学期的课表"即可；登录流程、参数发现链、写操作准则等细节均由 Skill 指导 agent 完成。
 
 ## 许可证
 
