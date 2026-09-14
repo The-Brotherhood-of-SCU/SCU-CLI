@@ -33,7 +33,7 @@ cmd/scu → internal/cli（cobra 命令，每命令组一个文件）
 ```
 
 - **ScuAuth 是认证单一事实来源**（`internal/auth/scu.go`）：持有持久化凭据（`internal/config`，`credentials.json` 0600 原子写入），token 本地 TTL 1 小时，过期用保存的账号密码 + 验证码 OCR 自动重登。密码用 SM2 加密（`sm2.go`，C1C2C3 原始拼接模式）。
-- **子系统认证（L2）实现 `SubsystemAuth` 接口**（`internal/auth/subsystem.go`）：`ZhjwAuth`（JWT SSO）、`WfwAuth`（CAS 预热，就绪判据是响应为 `e==0` 的 JSON，匿名 200 不算）、`SsoRelayAuth`（缴费/体测/办事大厅通用的 SSO 中继，可声明依赖其他子系统先就绪）、`CcylAuth`（第二课堂独立 OAuth token，与 SCU principal 绑定持久化）。
+- **子系统认证（L2）实现 `SubsystemAuth` 接口**（`internal/auth/subsystem.go`）：`ZhjwAuth`（JWT SSO）、`WfwAuth`（CAS 预热，就绪判据是响应为 `e==0` 的 JSON，匿名 200 不算）、`SsoRelayAuth`（缴费/体测/办事大厅/newservice 通用的 SSO 中继，可声明依赖其他子系统先就绪）、`ZhhqAuth`（智慧后勤：SSO 换 tokenKey + 每请求 AES 加密 Token 头，见 `zhhq.go`）、`CcylAuth`（第二课堂独立 OAuth token，与 SCU principal 绑定持久化）。
 - 子系统 client 有缓存，**根 client 身份变化时缓存自动作废**；`RetryOnUnauthenticated` 是统一恢复边界——认证失效时 invalidate + 重建 session，业务请求只重放一次。
 - **CookieClient 的铁律**（`internal/auth/cookie_client.go`）：重定向必须手动逐跳跟随，重定向策略必须返回 `http.ErrUseLastResponse`（不能用 `resty.NoRedirectPolicy()`，否则 3xx 被包装成 `*url.Error` 上抛）；跨源跳转剥离 `Authorization`/`Cookie` 等敏感 header，除非 `AllowSensitiveOrigin` 显式允许。教务 `zhjw.scu.edu.cn` 仅支持 HTTP。
 - 错误分类在 `internal/auth/errors.go`：`UnauthenticatedError`（触发重试）、`ServiceError`（不重试）、`LoginError`（`InvalidCaptcha` 时换验证码重试）、`CcylAuthExpiredError`（CCYL 边界重试一次）。

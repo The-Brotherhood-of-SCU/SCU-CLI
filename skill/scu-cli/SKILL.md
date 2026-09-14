@@ -3,8 +3,8 @@ name: scu-cli
 description: 使用 scu CLI 操作四川大学校园服务（教务课表/成绩/考表/教室/培养方案/校历、电费余额、体测成绩、第二课堂活动/报名/学分等）。当用户是四川大学学生或教职工，需要查询或操作校园服务时使用。需要先安装 scu 二进制并完成统一认证登录。
 slug: scu-cli
 displayName: 四川大学校园服务 CLI
-version: 0.4.1
-summary: 四川大学校园服务命令行 Skill——教务课表/成绩/考表/校历（支持 ICS 导出）、电费余额与消耗趋势、体测成绩、第二课堂活动/报名/学分、办事大厅事项查询与动态表单提交。
+version: 0.5.0
+summary: 四川大学校园服务命令行 Skill——教务课表/成绩/考表/校历/课程课表（支持 ICS 导出）、电费余额与消耗趋势、体测成绩、第二课堂活动/报名/学分、办事大厅事项查询与动态表单提交、智慧后勤在线报修、校园网无感认证管理。
 license: AGPL-3.0-only
 tags:
   - scu
@@ -101,6 +101,11 @@ scu login -u <学号> -p <密码>
 | `activityId` | `scu ccyl lib-detail <activityLibraryId>` 输出中各场次活动的 `id` |
 | `--score-type` | `scu ccyl score-types <activityLibraryId>` 输出的能力类型 `id` |
 | `creditId` | `scu ccyl credits` 输出记录 |
+| 报修地址 id | `scu repair addresses`（无地址先 `repair save-address`） |
+| 报修项目 id | `scu repair projects <area_id>` 输出的**叶子**项目 `value` |
+| 报修预约日期/时段 | `scu repair book-dates` → `book-times <date>` |
+| 报修工单 id / 评价 repairId | `scu repair list` 输出的 `id` → `repair detail` 输出的 `finished_info.repair_id` |
+| 无感设备 MAC | `scu passpoint devices` 输出的 `user_mac` |
 
 ## 5. 教务系统 `scu zhjw`
 
@@ -111,7 +116,7 @@ scu zhjw schedule --plan 2025-2026-2-1 # 课表（原始 JSON）
 scu zhjw grades                        # 及格成绩
 scu zhjw grades --scheme               # 方案成绩
 scu zhjw exams                         # 考表（考试安排）
-scu zhjw completion                    # 计划完成度
+scu zhjw completion                    # 计划完成度（多份培养方案：主修/辅修各一份，输出 plans[]）
 scu zhjw calendar                      # 校历（免认证，网络优先、失败回退本地缓存）
 
 # ICS 日历导出（--ics 必须带文件路径值；输出 JSON 含 file/events 等元信息）
@@ -139,6 +144,12 @@ scu zhjw class options                 # 筛选项（semesters/grades/department
 scu zhjw class subjects <departmentNum>                # 专业列表（含 subjectCode）
 scu zhjw class list --plan 2025-2026-2-1 --dept 301    # 记录含 id.executiveEducationPlanNumber / id.classNum
 scu zhjw class schedule <planCode> <classCode>         # 即上一步输出的两个字段
+
+# 课程课表（按教学班查排课；编号链：course index → search → schedule）
+scu zhjw course index                  # 筛选项（semesters/departments/categories 的 value）
+scu zhjw course search --name 高等数学 --page-size 10  # 课程（教学班）列表
+#   可选筛选：--semester --department --name --code --seq --category --page
+scu zhjw course schedule <ZXJXJHH> <KCH> <KXH>        # 三元组取自 search 记录
 ```
 
 ## 6. 用户信息 `scu user`（微服务）
@@ -245,9 +256,50 @@ scu service submit 350 --fields '{"Radio_30":"1","Input_31":"成都市","Calenda
 - 选项 value 合法性、必填、ShowHide 动态显隐/动态必填、日期顺序都在本地校验，报错即修正后重试。
 - 输出的 warnings 非空时要如实转告用户。
 
-## 11. 行为准则
+## 11. 在线报修 `scu repair`（智慧后勤）
 
-- **写操作先确认**：`ccyl signup/cancel/subscribe/unsubscribe/export`、`user offline`、`service submit`（先 --dry-run 给用户看提交体）、`balance query` 首次绑房等写操作，执行前向用户确认目标与参数；失败后不要自动重试（CLI 自身也不会重放写请求），先把错误报给用户。
+宿舍报修工单的提交与跟踪。`status` 由后端直接返回中文（待完工/待评价/已关闭/已撤回），不要自己映射数字。
+
+```bash
+# 只读查询
+scu repair addresses       # 常用报修地址（id 供 submit；user_id 供 list）
+scu repair areas           # 区域树（id/full_name 供 projects 与 save-address）
+scu repair projects <area_id>   # 维修项目两级树，--project 取叶子 value
+scu repair book-dates      # 可预约上门日期
+scu repair book-times <date>    # 某日期的可预约时段
+scu repair list            # 我的报修工单（按时间倒序；--user-id 可省略自动发现）
+scu repair detail <工单id>       # 工单详情（logs 为进度时间线；评价用 finished_info.repair_id）
+scu repair evaluate-projects    # 评价项（维修质量/态度/速度，id 供 --stars）
+
+# 写操作（先向用户确认）
+scu repair save-address --area-id 30006 --area-name 江安学生区/西苑六栋 \
+  --detail 5单元301C --phone 1xxxxxxxxxx [--default]
+scu repair submit --address-id <地址id> --project 101 --content '水龙头漏水关不紧' \
+  [--book-date 2026-09-15 --book-time 08:00-10:00] [--image 现场照片.jpg]... \
+  [--allow-absent] [--dry-run]
+scu repair withdraw <工单id>      # 撤回（仅待完工状态；不可撤回会明确报错）
+scu repair evaluate <repairId> --star 5 [--stars 评价项id:4]... [--content 感谢] [--labels 及时,专业]
+```
+
+submit 说明：`--project` 必须取 `projects` 输出的**叶子** value（大类 value 会报错）；提交流程与 App 一致（上传图片 → 预取负责部门 → 提交），先 `--dry-run` 输出完整提交体给用户确认。图片限 jpg/jpeg/png/heic/heif、单张 ≤10MB、最多 3 张。
+
+## 12. 校园网无感认证 `scu passpoint`
+
+绑定设备 MAC 后连接校园网自动完成认证（Passpoint），无需手动登录。
+
+```bash
+scu passpoint devices      # 已绑定设备（user_mac / 到期日期 / 出口 / 在线状态）
+scu passpoint user         # 校园网账户信息（account_state 1 为在线）
+scu passpoint add --mac AA:BB:CC:DD:EE:FF [--days 30] [--exit 中国电信]
+#   --days 0-365（0 = 最长有效期 6 年）；--exit 空=校园网 / 中国电信 / 中国移动 / 中国联通
+scu passpoint cancel --mac AA:BB:CC:DD:EE:FF   # 取消绑定（mac 取自 devices）
+```
+
+MAC 格式以设备系统显示为准（一般冒号分隔）。`add`/`cancel` 为写操作，执行前确认。
+
+## 13. 行为准则
+
+- **写操作先确认**：`ccyl signup/cancel/subscribe/unsubscribe/export`、`user offline`、`service submit`（先 --dry-run 给用户看提交体）、`repair submit`（先 --dry-run）/`withdraw`/`evaluate`/`save-address`、`passpoint add`/`cancel`、`balance query` 首次绑房等写操作，执行前向用户确认目标与参数；失败后不要自动重试（CLI 自身也不会重放写请求），先把错误报给用户。
 - 只读命令可自由串行调用；优先用发现链逐级取 ID，不要向用户索要可以自动发现的编号。
 - 凭据文件含账号密码，不要打印、复制或外发其内容。
 - `unauthenticated` 错误一律引导重新登录，不要尝试其他绕过方式。

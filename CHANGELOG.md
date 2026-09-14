@@ -4,6 +4,25 @@
 
 发布流程：推送 `vX.Y.Z` 标签触发 GitHub Action，自动从本文件提取对应版本章节作为 Release 说明，并在 Release 完成后通过 OIDC Trusted Publishing 将包发布到 npm（无需长期 token）、通过 SkillHub CLI 同步发布 Agent Skill（需配置 Secret `SKILLHUB_KEY`，未配置则跳过）。
 
+## [0.5.0] - 2026-09-14
+
+功能对齐校园生活助手 App [Bugaoshan](https://github.com/The-Brotherhood-of-SCU/Bugaoshan) 2.5.1，本轮移植在线报修、校园网无感认证、课程课表查询与多培养方案支持。
+
+### 新增
+
+- 在线报修（新命令组 `scu repair`，智慧后勤 zhhq——SSO 中继换取 tokenKey，请求 Token 头与响应体均为 AES-128-CBC 加密，协议移植自 Bugaoshan）：
+  - `repair addresses / areas / projects / book-dates / book-times` 地址、区域树、维修项目两级树与可预约时段的发现链
+  - `repair list / detail` 我的报修工单（中文状态、content 多层转义与裸控制字符兼容解析）与工单详情（进度时间线）
+  - `repair submit` 提交工单——图片上传（格式白名单 + 10MB 上限）、负责部门预取（acceptDept*/payName）、`--dry-run` 预览提交体
+  - `repair withdraw / evaluate / evaluate-projects / save-address` 工单撤回（先校验可撤回）、评价（统一或按评价项打分）、常用地址保存
+- 校园网无感认证（新命令组 `scu passpoint`，newservice 平台 SSO 中继）：`devices / user` 查询已绑定设备与账户，`add / cancel` 绑定/解绑设备 MAC（有效期 0-365 天，0 为最长 6 年；出口可选电信/移动/联通）
+- 教务课程课表查询（`scu zhjw course index / search / schedule`）：按学期/院系/课程名等筛选课程（教学班），再按 ZXJXJHH/KCH/KXH 三元组查该课程的排课安排
+- 教务：`zhjw completion` 支持多份培养方案（主修/辅修/微专业）——输出改为 `plans[]`（每份含 id/name/nodes），多方案用户自动从方案选择页逐个拉取详情（间隔 600ms 防限流），单方案行为不变（`id` 为空串）；页面结构异常不再静默返回空列表
+
+### 变更
+
+- `zhjw completion` 输出结构由 zTree 节点数组改为 `plans[]` 包装（破坏性变更：解析方需从 `data[].nodes` 取节点）
+
 ## [0.4.1] - 2026-08-18
 
 ### 重构
@@ -80,6 +99,7 @@
 - SSO 重定向链无法工作：`resty.NoRedirectPolicy()` 使任何 3xx 响应变成传输错误（auto redirect is disabled），改为 `http.ErrUseLastResponse` 哨兵；同时恢复各 API 层「302 = 会话过期」的检测能力
 - 容错统一认证跳教务的畸形 Location（`/sigin ?id_token=…` 含字面空格，百分号编码后与浏览器/Dart 行为一致）
 
+[0.5.0]: https://github.com/The-Brotherhood-of-SCU/SCU-CLI/releases/tag/v0.5.0
 [0.3.0]: https://github.com/The-Brotherhood-of-SCU/SCU-CLI/releases/tag/v0.3.0
 [0.2.0]: https://github.com/The-Brotherhood-of-SCU/SCU-CLI/releases/tag/v0.2.0
 [0.1.0]: https://github.com/The-Brotherhood-of-SCU/SCU-CLI/releases/tag/v0.1.0

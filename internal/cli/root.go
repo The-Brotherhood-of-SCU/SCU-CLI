@@ -17,12 +17,14 @@ var rootCmd = &cobra.Command{
 
 覆盖服务：
   统一认证  login / logout / whoami
-  教务系统  课表 / 成绩 / 考表 / 空闲教室 / 培养方案 / 校历
+  教务系统  课表 / 成绩 / 考表 / 空闲教室 / 培养方案 / 校历 / 课程课表
   微服务    用户信息 / 校园网设备管理
   缴费平台  电费 / 空调余额
   体测系统  体测成绩 / 通知
   第二课堂  活动 / 报名 / 学分
   办事大厅  我的申请 / 事项表单提交
+  智慧后勤  在线报修（工单提交 / 进度 / 撤回 / 评价）
+  无感认证  校园网 Passpoint MAC 绑定管理
 
 所有命令默认输出 JSON 到 stdout，诊断信息输出到 stderr，
 退出码 0 表示成功，非 0 表示失败。`,
@@ -48,4 +50,6 @@ func init() {
 	rootCmd.AddCommand(fitnessCmd)
 	rootCmd.AddCommand(ccylCmd)
 	rootCmd.AddCommand(serviceCmd)
+	rootCmd.AddCommand(repairCmd)
+	rootCmd.AddCommand(passpointCmd)
 }

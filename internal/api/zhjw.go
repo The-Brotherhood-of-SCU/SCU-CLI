@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/The-Brotherhood-of-SCU/SCU-CLI/internal/auth"
 )
@@ -532,8 +533,128 @@ func (s *ZhjwService) FetchCourseDetail(urlPath string) (map[string]interface{},
 
 var zNodesRegexp = regexp.MustCompile(`(?s)var\s+zNodes\s*=\s*(\[.*?\]);`)
 
-// FetchPlanCompletion 获取计划完成度（zTree 节点原始 JSON）。
-func (s *ZhjwService) FetchPlanCompletion() ([]interface{}, error) {
+// PlanCompletion 一份培养方案的修读数据（zTree 节点原始 JSON）。
+//
+// 教务系统对有多份培养方案（主修+辅修等）的用户，/planCompletion/index
+// 返回的是方案选择页（不含 zNodes 数据），真正的树数据在
+// /getPyfaIndex/<方案ID> 详情页；单方案用户则直接由 index 页返回数据。
+// ID 为空串表示数据直接来自 index 页（单方案场景）。
+type PlanCompletion struct {
+	ID    string        `json:"id"`
+	Name  string        `json:"name,omitempty"`
+	Nodes []interface{} `json:"nodes"`
+}
+
+// tryParseZNodes 尝试从 HTML 提取 zNodes 数组。
+// 正则未匹配时 matched=false（不代表"无方案"，可能是选择页）；
+// 匹配成功但 JSON 解析失败时返回错误（可诊断）。
+func tryParseZNodes(html string) (nodes []interface{}, matched bool, err error) {
+	m := zNodesRegexp.FindStringSubmatch(html)
+	if m == nil {
+		return nil, false, nil
+	}
+	if err := json.Unmarshal([]byte(m[1]), &nodes); err != nil {
+		return nil, true, &auth.ServiceError{Msg: "方案修读数据解析失败: " + err.Error()}
+	}
+	return nodes, true, nil
+}
+
+// extractPlanName 提取方案名（单方案场景，来自 index 页 echarts 雷达图
+// legend：data: ['某某培养方案']）。提取不到返回空串。
+func extractPlanName(html string) string {
+	m := regexp.MustCompile(`(?s)data:\s*\[\s*'([^']+)'\s*\]`).FindStringSubmatch(html)
+	if m == nil {
+		return ""
+	}
+	name := strings.TrimSpace(m[1])
+	if len([]rune(name)) > 60 {
+		return string([]rune(name)[:60])
+	}
+	return name
+}
+
+// planLink 方案选择页入口的解析结果。
+type planLink struct {
+	ID   string
+	Name string
+	Path string
+}
+
+// extractPlanLinks 从方案选择页提取 getPyfaIndex/<方案ID> 入口。
+//
+// 入口形态（真机抓包确认）：
+//   - 按钮：onclick="getPyfaIndex('ID');..." + title="方案名(ID)"
+//     （onclick 里的引号可能是 &#39; HTML 实体）
+//   - 链接：<a href="...getPyfaIndex/123...">方案名</a>（兜底）
+//   - 裸 ID（JS 字符串等，最后兜底）
+func extractPlanLinks(html string) []planLink {
+	var links []planLink
+	seen := map[string]bool{}
+	addPlan := func(id, name string) {
+		if seen[id] {
+			return
+		}
+		seen[id] = true
+		name = strings.TrimSpace(name)
+		if name == "" {
+			name = "方案" + id
+		}
+		links = append(links, planLink{
+			ID:   id,
+			Name: name,
+			Path: "/student/integratedQuery/planCompletion/getPyfaIndex/" + id,
+		})
+	}
+
+	// 1) 按钮形态：onclick="getPyfaIndex('ID');" + title="方案名(ID)"
+	buttonRe := regexp.MustCompile(`(?s)onclick=["'][^"']*getPyfaIndex\(\s*(?:&#39;|&quot;|['"])?(\d+)(?:&#39;|&quot;|['"])?\s*\)`)
+	titleRe := regexp.MustCompile(`title=["']([^"']*)["']`)
+	for _, loc := range buttonRe.FindAllStringSubmatchIndex(html, -1) {
+		id := html[loc[2]:loc[3]]
+		// 按钮的 title 属性含方案名（如 广播电视编导培养方案(10692)）。
+		tagStart := strings.LastIndex(html[:loc[0]], "<button")
+		tagEnd := strings.Index(html[loc[0]:], ">")
+		if tagStart >= 0 && tagEnd > 0 {
+			tag := html[tagStart : loc[0]+tagEnd]
+			if tm := titleRe.FindStringSubmatch(tag); tm != nil {
+				name := strings.TrimSpace(tm[1])
+				name = regexp.MustCompile(`\(\d+\)\s*$`).ReplaceAllString(name, "")
+				addPlan(id, name)
+				continue
+			}
+		}
+		addPlan(id, "")
+	}
+
+	// 2) 链接形态：<a href="...getPyfaIndex/123...">名称</a>
+	if len(links) == 0 {
+		anchorRe := regexp.MustCompile(`(?s)<a[^>]*href=["'][^"']*getPyfaIndex/(\d+)[^"']*["'][^>]*>(.*?)</a>`)
+		tagRe := regexp.MustCompile(`<[^>]+>`)
+		for _, m := range anchorRe.FindAllStringSubmatch(html, -1) {
+			rawName := tagRe.ReplaceAllString(m[2], "")
+			rawName = strings.ReplaceAll(rawName, "&nbsp;", " ")
+			addPlan(m[1], rawName)
+		}
+	}
+
+	// 3) 兜底：非按钮/链接形态（如 JS 字符串）也提取 ID。
+	if len(links) == 0 {
+		bareRe := regexp.MustCompile(`getPyfaIndex/(\d+)`)
+		for _, m := range bareRe.FindAllStringSubmatch(html, -1) {
+			addPlan(m[1], "")
+		}
+	}
+	return links
+}
+
+// FetchPlanCompletion 获取计划完成度，返回多份培养方案（每份含树节点列表）。
+//
+// 解析策略（与 Bugaoshan fetchPlanCompletion 一致）：
+//  1. 请求 /index；若页面含非空 zNodes（有根节点）→ 单方案，直接解析；
+//  2. 否则从页面提取 getPyfaIndex/<ID> 链接逐个请求详情页（间隔 600ms 防限流）；
+//  3. 两者皆无且 zNodes 明确为空数组 → 账号无方案，返回空列表；
+//  4. 页面结构异常（登录页 → 会话过期；其它 → ServiceError）。
+func (s *ZhjwService) FetchPlanCompletion() ([]PlanCompletion, error) {
 	v, err := s.request(func(c *auth.CookieClient) (interface{}, error) {
 		resp, err := c.Get(zbase+"/student/integratedQuery/planCompletion/index", zhtmlHeaders)
 		if err != nil {
@@ -544,30 +665,77 @@ func (s *ZhjwService) FetchPlanCompletion() ([]interface{}, error) {
 			return nil, &auth.RateLimitedError{Msg: "教务系统限流：请勿频繁刷新"}
 		}
 		trimmed := strings.TrimSpace(body)
-		// 302 / 空 body 是会话过期（CookieClient 不自动跟随重定向），
-		// 不能落入下方 m == nil 分支静默返回空列表。
+		// 302 / 空 body 是会话过期（CookieClient 不自动跟随重定向）。
 		if resp.StatusCode == 302 || trimmed == "" {
 			return nil, &auth.UnauthenticatedError{Msg: "教务 session 已过期"}
 		}
-		// 正常的完成度页本身是 HTML（含 zNodes），只有"是 HTML 但不含
-		// zNodes"才判定为登录页，不能用 checkZhjwSessionExpiry。
-		if strings.HasPrefix(trimmed, "<") && !strings.Contains(body, "zNodes") {
+
+		// 1) 尝试直接解析 zNodes（单方案场景）。匹配不上时继续走
+		//    链接提取分支（多方案选择页可能不含 zNodes）。
+		directNodes, matched, err := tryParseZNodes(body)
+		if err != nil {
+			return nil, err
+		}
+		if matched && len(directNodes) > 0 {
+			return []PlanCompletion{{ID: "", Name: extractPlanName(body), Nodes: directNodes}}, nil
+		}
+
+		// 2) 多方案场景：从入口页提取 getPyfaIndex 链接，逐个请求详情页。
+		planLinks := extractPlanLinks(body)
+		if len(planLinks) > 0 {
+			plans := make([]PlanCompletion, 0, len(planLinks))
+			for _, link := range planLinks {
+				// 教务系统对连续请求有限流（"请勿频繁刷新"），详情页之间
+				// 加短暂间隔，避免一次触发 N+1 个请求被限流。
+				if len(plans) > 0 {
+					time.Sleep(600 * time.Millisecond)
+				}
+				detailResp, err := c.Get(zbase+link.Path, map[string]string{
+					"Accept":     "text/html,*/*",
+					"Referer":    zbase + "/student/integratedQuery/planCompletion/index",
+					"User-Agent": auth.DefaultUserAgent,
+				})
+				if err != nil {
+					return nil, err
+				}
+				detailBody := string(detailResp.Body)
+				// 详情页可能返回登录页（会话过期）或限流提示。
+				if strings.Contains(detailBody, "请勿频繁刷新") {
+					return nil, &auth.RateLimitedError{Msg: "教务系统限流：请勿频繁刷新"}
+				}
+				if detailResp.StatusCode == 302 || strings.TrimSpace(detailBody) == "" ||
+					(strings.HasPrefix(strings.TrimSpace(detailBody), "<") && !strings.Contains(detailBody, "zNodes")) {
+					return nil, &auth.UnauthenticatedError{Msg: "教务 session 已过期"}
+				}
+				// 详情页必须包含数据；解析失败在此抛错，不再静默返回空。
+				nodes, matched, err := tryParseZNodes(detailBody)
+				if err != nil {
+					return nil, err
+				}
+				if !matched {
+					return nil, &auth.ServiceError{Msg: "方案修读数据格式异常：详情页未找到 zNodes 数据"}
+				}
+				plans = append(plans, PlanCompletion{ID: link.ID, Name: link.Name, Nodes: nodes})
+			}
+			return plans, nil
+		}
+
+		// 3) 无数据也无链接：zNodes 明确存在但为空数组 → 账号无方案。
+		if matched {
+			return []PlanCompletion{}, nil
+		}
+
+		// 4) 页面结构异常：登录页 → 会话过期；其它 → 可诊断错误
+		//    （避免触发重认证风暴——每次都会重新 SSO，进一步触发限流）。
+		if auth.LooksLikeLoginPage(body) {
 			return nil, &auth.UnauthenticatedError{Msg: "教务 session 已过期"}
 		}
-		m := zNodesRegexp.FindStringSubmatch(body)
-		if m == nil {
-			return []interface{}{}, nil
-		}
-		var nodes []interface{}
-		if err := json.Unmarshal([]byte(m[1]), &nodes); err != nil {
-			return []interface{}{}, nil
-		}
-		return nodes, nil
+		return nil, &auth.ServiceError{Msg: "方案修读数据格式异常：页面无法解析"}
 	})
 	if err != nil {
 		return nil, err
 	}
-	return v.([]interface{}), nil
+	return v.([]PlanCompletion), nil
 }
 
 // ─── 班级课表 ────────────────────────────────────────────────────
@@ -694,6 +862,107 @@ func (s *ZhjwService) FetchClassSchedule(planCode, classCode string) ([]interfac
 		list, ok := arr[0].([]interface{})
 		if !ok {
 			return nil, &auth.ServiceError{Msg: "[searchCurriculumInfo/callback] 响应格式异常：首元素不是数组"}
+		}
+		return list, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return v.([]interface{}), nil
+}
+
+// ─── 课程课表 ────────────────────────────────────────────────────
+
+// FetchCourseCurriculumIndex 获取课程课表首页的筛选选项
+// （学年学期 zxjxjhh / 开课院系 kkxsh / 课程类别 kclb）。
+func (s *ZhjwService) FetchCourseCurriculumIndex() (map[string]interface{}, error) {
+	v, err := s.request(func(c *auth.CookieClient) (interface{}, error) {
+		body, err := zhjwGet(c, zbase+"/student/teachingResources/courseCurriculum/index", zhtmlHeaders)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{
+			"semesters":   parseSelectOptions(body, "zxjxjhh"),
+			"departments": parseSelectOptions(body, "kkxsh"),
+			"categories":  parseSelectOptions(body, "kclb"),
+		}, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return v.(map[string]interface{}), nil
+}
+
+// FetchCourseList 搜索课程列表（教学班），支持学期/院系/课程名/课程号/
+// 课序号/课程类别筛选。返回 {records, total}；records 各项含
+// ZXJXJHH/KCH/KXH（course schedule 三元组来源）。
+func (s *ZhjwService) FetchCourseList(pageNum, pageSize int, semester, department, courseName, courseCode, courseSeq, category string) (map[string]interface{}, error) {
+	form := url.Values{
+		"zxjxjhh":  {semester},
+		"kkxsh":    {department},
+		"kcm":      {courseName},
+		"kch":      {courseCode},
+		"kxh":      {courseSeq},
+		"kclb":     {category},
+		"pageNum":  {fmt.Sprint(pageNum)},
+		"pageSize": {fmt.Sprint(pageSize)},
+	}
+	headers := map[string]string{
+		"Accept":           "application/json, text/javascript, */*; q=0.01",
+		"Content-Type":     "application/x-www-form-urlencoded; charset=UTF-8",
+		"Referer":          zbase + "/student/teachingResources/courseCurriculum/index",
+		"User-Agent":       auth.DefaultUserAgent,
+		"X-Requested-With": "XMLHttpRequest",
+	}
+	v, err := s.request(func(c *auth.CookieClient) (interface{}, error) {
+		var out map[string]interface{}
+		if err := zhjwPostJSON(c, zbase+"/student/teachingResources/courseCurriculum/search",
+			"courseCurriculum/search", headers, form, &out); err != nil {
+			return nil, err
+		}
+		records := out["records"]
+		if records == nil {
+			records = []interface{}{}
+		}
+		total := 0
+		if pc, ok := out["pageContext"].(map[string]interface{}); ok {
+			total = int(toIntLoose(pc["totalCount"], 0))
+		}
+		return map[string]interface{}{"records": records, "total": total}, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return v.(map[string]interface{}), nil
+}
+
+// courseAjaxHeaders 课程课表 AJAX 请求头。
+var courseAjaxHeaders = map[string]string{
+	"Accept":           "application/json, text/javascript, */*; q=0.01",
+	"Referer":          zbase + "/student/teachingResources/courseCurriculum/index",
+	"User-Agent":       auth.DefaultUserAgent,
+	"X-Requested-With": "XMLHttpRequest",
+}
+
+// FetchCourseSchedule 获取指定课程（教学班）的课表，返回结构与班级课表一致。
+// 三元组 planCode(ZXJXJHH)/courseCode(KCH)/courseSequenceCode(KXH) 来自 course search。
+func (s *ZhjwService) FetchCourseSchedule(planCode, courseCode, courseSequenceCode string) ([]interface{}, error) {
+	u := zbase + "/student/teachingResources/courseCurriculum/searchCurriculum/callback" +
+		"?planCode=" + url.QueryEscape(planCode) +
+		"&courseCode=" + url.QueryEscape(courseCode) +
+		"&courseSequenceCode=" + url.QueryEscape(courseSequenceCode)
+	v, err := s.request(func(c *auth.CookieClient) (interface{}, error) {
+		var arr []interface{}
+		if err := zhjwGetJSON(c, u, "courseCurriculum/searchCurriculum", courseAjaxHeaders, &arr); err != nil {
+			return nil, err
+		}
+		if len(arr) == 0 {
+			return []interface{}{}, nil
+		}
+		// 响应结构为 [[item, ...]]：外层数组只有一个元素，内层才是课表项。
+		list, ok := arr[0].([]interface{})
+		if !ok {
+			return nil, &auth.ServiceError{Msg: "[courseCurriculum/searchCurriculum] 响应格式异常：首元素不是数组"}
 		}
 		return list, nil
 	})

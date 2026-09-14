@@ -195,7 +195,11 @@ var zhjwExamsCmd = &cobra.Command{
 
 var zhjwCompletionCmd = &cobra.Command{
 	Use:   "completion",
-	Short: "获取计划完成度（zTree 节点）",
+	Short: "获取计划完成度（多份培养方案，主修/辅修/微专业各一份）",
+	Long: `获取计划完成度（zTree 节点）。输出 plans 数组，每份培养方案一项：
+单方案用户只有一项（id 为空）；多方案用户（主修+辅修等）每份方案一项，
+id 为方案 ID、name 为方案名。nodes 为 zTree 节点原始 JSON
+（name 含 HTML，sfwc=="是" 表示已完成）。`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runJSON(func() (interface{}, error) {
 			s, err := newZhjwService()
@@ -414,6 +418,79 @@ var zhjwClassScheduleCmd = &cobra.Command{
 	},
 }
 
+// ─── 课程课表 ────────────────────────────────────────────────────
+
+var zhjwCourseCmd = &cobra.Command{
+	Use:   "course",
+	Short: "课程课表查询（index / search / schedule）",
+	Long: `课程课表：按学期/院系/课程名等条件搜索课程（教学班），
+再查看某门课程的排课安排（返回结构与班级课表一致）。发现链：
+
+  semester   ← zhjw course index 输出的 semesters[].value（如 2026-2027-1-1）
+  department ← zhjw course index 输出的 departments[].value
+  category   ← zhjw course index 输出的 categories[].value
+  planCode/courseCode/courseSeq ← zhjw course search 输出记录的
+                ZXJXJHH / KCH / KXH 字段`,
+}
+
+var zhjwCourseIndexCmd = &cobra.Command{
+	Use:   "index",
+	Short: "获取课程课表筛选选项（semesters/departments/categories）",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runJSON(func() (interface{}, error) {
+			s, err := newZhjwService()
+			if err != nil {
+				return nil, err
+			}
+			return s.FetchCourseCurriculumIndex()
+		})
+	},
+}
+
+var courseSearchArgs struct {
+	semester, department, name, code, seq, category string
+	page, pageSize                                  int
+}
+
+var zhjwCourseSearchCmd = &cobra.Command{
+	Use:   "search",
+	Short: "搜索课程列表（教学班；输出记录含 ZXJXJHH/KCH/KXH 三元组）",
+	Long: `搜索课程（教学班）。筛选参数取自 zhjw course index：
+--semester（学年学期 value）、--department（开课院系 value）、
+--name（课程名关键词）、--code（课程号）、--seq（课序号）、--category（课程类别 value）。
+输出 records（KCM 课程名 / JSM 教师 / KKXSM 开课院系 / XF 学分等）与 total。`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runJSON(func() (interface{}, error) {
+			s, err := newZhjwService()
+			if err != nil {
+				return nil, err
+			}
+			a := courseSearchArgs
+			return s.FetchCourseList(a.page, a.pageSize, a.semester, a.department, a.name, a.code, a.seq, a.category)
+		})
+	},
+}
+
+var zhjwCourseScheduleCmd = &cobra.Command{
+	Use:   "schedule <planCode> <courseCode> <courseSeq>",
+	Short: "获取指定课程（教学班）的课表（三元组取自 course search 记录）",
+	Long: `获取某门课程（教学班）的排课安排，返回结构与 class schedule 一致：
+各项含 id.skxq（星期 1-7）、id.skjc（开始节次）、cxjc（持续节数）、
+kcm（课程名）、jsm（教师）、zcsm（周次说明）、xqm/jxlm/jasm（校区/教学楼/教室）。
+planCode/courseCode/courseSeq 对应 course search 输出记录的
+ZXJXJHH / KCH / KXH 字段。`,
+	Args: cobra.ExactArgs(3),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runJSON(func() (interface{}, error) {
+			s, err := newZhjwService()
+			if err != nil {
+				return nil, err
+			}
+			return s.FetchCourseSchedule(args[0], args[1], args[2])
+		})
+	},
+}
+
 var zhjwCalendarICSFile string
 
 var zhjwCalendarCmd = &cobra.Command{
@@ -476,8 +553,19 @@ func init() {
 	l.StringVar(&classListArgs.subject, "subject", "", "专业编号（class subjects 输出的 subjectCode；可空）")
 	l.StringVar(&classListArgs.classNum, "class-num", "", "班级编号（可空，精确过滤）")
 
+	c := zhjwCourseSearchCmd.Flags()
+	c.StringVar(&courseSearchArgs.semester, "semester", "", "学年学期（course index 的 semesters[].value；可空）")
+	c.StringVar(&courseSearchArgs.department, "department", "", "开课院系（course index 的 departments[].value；可空）")
+	c.StringVar(&courseSearchArgs.name, "name", "", "课程名关键词（可空）")
+	c.StringVar(&courseSearchArgs.code, "code", "", "课程号（可空）")
+	c.StringVar(&courseSearchArgs.seq, "seq", "", "课序号（可空）")
+	c.StringVar(&courseSearchArgs.category, "category", "", "课程类别（course index 的 categories[].value；可空）")
+	c.IntVar(&courseSearchArgs.page, "page", 1, "页码")
+	c.IntVar(&courseSearchArgs.pageSize, "page-size", 30, "每页条数")
+
 	zhjwClassroomCmd.AddCommand(zhjwClassroomIndexCmd, zhjwClassroomTypesCmd, zhjwClassroomQueryCmd)
 	zhjwProgramCmd.AddCommand(zhjwProgramCollegesCmd, zhjwProgramGradesCmd, zhjwProgramSearchCmd, zhjwProgramDetailCmd, zhjwProgramCourseCmd)
 	zhjwClassCmd.AddCommand(zhjwClassOptionsCmd, zhjwClassSubjectsCmd, zhjwClassListCmd, zhjwClassScheduleCmd)
-	zhjwCmd.AddCommand(zhjwWeekCmd, zhjwSemestersCmd, zhjwScheduleCmd, zhjwGradesCmd, zhjwExamsCmd, zhjwCompletionCmd, zhjwCalendarCmd, zhjwClassroomCmd, zhjwProgramCmd, zhjwClassCmd)
+	zhjwCourseCmd.AddCommand(zhjwCourseIndexCmd, zhjwCourseSearchCmd, zhjwCourseScheduleCmd)
+	zhjwCmd.AddCommand(zhjwWeekCmd, zhjwSemestersCmd, zhjwScheduleCmd, zhjwGradesCmd, zhjwExamsCmd, zhjwCompletionCmd, zhjwCalendarCmd, zhjwClassroomCmd, zhjwProgramCmd, zhjwClassCmd, zhjwCourseCmd)
 }

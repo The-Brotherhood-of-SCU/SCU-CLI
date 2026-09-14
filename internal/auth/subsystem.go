@@ -235,6 +235,16 @@ func NewServiceHallAuth(scu *ScuAuth) *SsoRelayAuth {
 		"https://service.scu.edu.cn/api/login/main?redirect_url=https%3A%2F%2Fservice.scu.edu.cn%2Fv2%2Fmatter%2F")
 }
 
+// NewNewServiceAuth 智慧线上服务平台（service.scu.edu.cn/newservice，
+// 无感认证 passpoint）。SSO 链：/newservice/api/login/cas（302）→
+// id.scu.edu.cn CAS → 回跳时 Set-Cookie 下发 process_uid / process_number
+// 会话 cookie（与办事大厅 vjuid 会话相互独立）。
+func NewNewServiceAuth(scu *ScuAuth) *SsoRelayAuth {
+	return NewSsoRelayAuth(scu, "newservice",
+		"https://service.scu.edu.cn/newservice/api/login/cas"+
+			"?redirect_url=https%3A%2F%2Fservice.scu.edu.cn%2Fnewservice%2Ffe%2Fsite%2Fm_passpoint%3Fplatform_id%3D31%26platform_id%3D31")
+}
+
 // ─── 通用重试 ───────────────────────────────────────────────────
 
 // RetryOnUnauthenticated 对应 Bugaoshan 的 retryOnUnauthenticated：

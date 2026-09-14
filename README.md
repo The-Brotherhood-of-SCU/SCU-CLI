@@ -64,10 +64,11 @@ stdout 恒为单个 JSON 对象，诊断信息走 stderr：
 | `schedule --plan <planCode>` | 课表 |
 | `schedule/exams/calendar --ics <file>` | 导出 ICS 日历文件（课表按周次/单双周/节次展开，节次时段按校区自动探测；支持 `--start-date`、`--campus` 覆盖） |
 | `grades [--scheme]` | 及格成绩 / 方案成绩 |
-| `exams` / `completion` | 考表 / 计划完成度 |
+| `exams` / `completion` | 考表 / 计划完成度（多份培养方案，主修/辅修/微专业各一份） |
 | `classroom index → types → query` | 空闲教室查询（逐级取校区/教学楼编号） |
 | `program colleges → grades → search → detail → course` | 培养方案查询 |
 | `class options → subjects → list → schedule` | 班级课表 |
+| `course index → search → schedule` | 课程课表（按教学班查排课安排） |
 
 ### 用户（微服务）`scu user`
 
@@ -108,6 +109,25 @@ stdout 恒为单个 JSON 对象，诊断信息走 stderr：
 | `applications [--status 0\|1\|3] [--page N]` | 我的申请列表（请假/报备等事项的进度，状态看 `inst_status` 字段） |
 | `form <app_id>` | 查看事项表单结构（字段 key/类型/选项/必填/预填值/日期校验） |
 | `submit <app_id> --fields '<json>' [--attach Key=path] [--dry-run]` | 动态表单提交（选项/日期/省市区/附件类型感知，ShowHide 显隐与必填本地校验，先 `--dry-run` 预览提交体） |
+
+### 在线报修 `scu repair`
+
+| 命令 | 说明 |
+|---|---|
+| `addresses` / `areas` / `projects <areaId>` | 常用地址 / 区域树 / 维修项目两级树（submit 参数的发现链） |
+| `book-dates` / `book-times <date>` | 可预约上门日期 / 时段 |
+| `list` / `detail <id>` | 我的报修工单（中文状态）/ 工单详情（进度时间线 + 评价对象 id） |
+| `submit --address-id … --project … --content …` | 提交报修工单（`--image` 附图、`--allow-absent` 无人值守、`--dry-run` 预览提交体） |
+| `withdraw <id>` / `evaluate <repairId> --star N` | 撤回工单 / 评价工单（支持按评价项 `--stars id:分数`） |
+| `save-address --area-id … --area-name … --detail … --phone …` | 保存常用报修地址 |
+
+### 无感认证 `scu passpoint`
+
+| 命令 | 说明 |
+|---|---|
+| `devices` / `user` | 已绑定无感设备列表 / 校园网账户信息 |
+| `add --mac <MAC> [--days N] [--exit 运营商]` | 绑定设备 MAC（绑定后连校园网自动认证；`--days 0` 为最长 6 年） |
+| `cancel --mac <MAC>` | 取消指定设备的无感认证 |
 
 ## 许可证
 
