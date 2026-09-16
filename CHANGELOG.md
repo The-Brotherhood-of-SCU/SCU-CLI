@@ -4,6 +4,14 @@
 
 发布流程：推送 `vX.Y.Z` 标签触发 GitHub Action，自动从本文件提取对应版本章节作为 Release 说明，并在 Release 完成后通过 OIDC Trusted Publishing 将包发布到 npm（无需长期 token）、通过 SkillHub CLI 同步发布 Agent Skill（需配置 Secret `SKILLHUB_KEY`，未配置则跳过）。
 
+## [Unrelease]
+
+## [0.5.1] - 2026-09-16
+
+### 修复
+
+- 无感认证：`passpoint add/cancel` 的 `--mac` 现按后端要求归一化为 12 位大写无分隔符十六进制（自动去除空格/冒号/连字符并转大写，位数或字符非法时报 input 错误）；文档示例此前为冒号分隔格式，与 newservice 后端实际要求不符（后端与 Bugaoshan 一致，只接受无分隔符十六进制）
+
 ## [0.5.0] - 2026-09-14
 
 功能对齐校园生活助手 App [Bugaoshan](https://github.com/The-Brotherhood-of-SCU/Bugaoshan) 2.5.1，本轮移植在线报修、校园网无感认证、课程课表查询与多培养方案支持。

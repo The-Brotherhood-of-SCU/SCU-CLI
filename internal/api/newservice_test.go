@@ -47,17 +47,17 @@ func TestDecodeNewServiceResponseBusinessError(t *testing.T) {
 
 func TestParsePasspointDevice(t *testing.T) {
 	dev := parsePasspointDevice(map[string]interface{}{
-		"userMac":            "AA:BB:CC:DD:EE:FF",
+		"userMac":            "B8782EBDCE85",
 		"macExpireTime":      "2026-09-02",
 		"defaultServiceName": "中国电信",
 		"isOnline":           true,
 	})
-	if !dev.IsOnline || dev.MacExpireTime != "2026-09-02" || dev.UserMac != "AA:BB:CC:DD:EE:FF" {
+	if !dev.IsOnline || dev.MacExpireTime != "2026-09-02" || dev.UserMac != "B8782EBDCE85" {
 		t.Fatalf("device = %+v", dev)
 	}
 
 	// 空/非法到期时间（"最长有效期 6 年"场景）→ 空串。
-	dev = parsePasspointDevice(map[string]interface{}{"userMac": "11:22:33:44:55:66", "macExpireTime": "", "isOnline": "1"})
+	dev = parsePasspointDevice(map[string]interface{}{"userMac": "112233445566", "macExpireTime": "", "isOnline": "1"})
 	if dev.MacExpireTime != "" || !dev.IsOnline {
 		t.Fatalf("device = %+v", dev)
 	}

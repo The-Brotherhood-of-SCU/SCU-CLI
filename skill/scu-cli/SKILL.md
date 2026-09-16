@@ -290,12 +290,12 @@ submit 说明：`--project` 必须取 `projects` 输出的**叶子** value（大
 ```bash
 scu passpoint devices      # 已绑定设备（user_mac / 到期日期 / 出口 / 在线状态）
 scu passpoint user         # 校园网账户信息（account_state 1 为在线）
-scu passpoint add --mac AA:BB:CC:DD:EE:FF [--days 30] [--exit 中国电信]
+scu passpoint add --mac B8782EBDCE85 [--days 30] [--exit 中国电信]
 #   --days 0-365（0 = 最长有效期 6 年）；--exit 空=校园网 / 中国电信 / 中国移动 / 中国联通
-scu passpoint cancel --mac AA:BB:CC:DD:EE:FF   # 取消绑定（mac 取自 devices）
+scu passpoint cancel --mac B8782EBDCE85   # 取消绑定（mac 取自 devices）
 ```
 
-MAC 格式以设备系统显示为准（一般冒号分隔）。`add`/`cancel` 为写操作，执行前确认。
+MAC 为 12 位十六进制、无分隔符、大写（如 B8782EBDCE85）；冒号/连字符小写写法会自动归一化，位数不对报 input 错误。`add`/`cancel` 为写操作，执行前确认。
 
 ## 13. 行为准则
 
