@@ -6,6 +6,8 @@
 
 ## [Unrelease]
 
+## [0.6.0] - 2026-09-24
+
 ### 新增
 
 - `scu user transactions`：校园卡扣费/充值明细（数据源：微服务电子卡交易记录 `cardhis/wap/default/get-index`，支持 `--sdate/--edate` 区间过滤，输出每日消费合计与最新余额；余额本身已含于 `scu user labels`，故不设独立 balance 命令）
