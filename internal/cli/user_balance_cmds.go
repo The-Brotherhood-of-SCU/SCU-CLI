@@ -93,31 +93,9 @@ var userOfflineCmd = &cobra.Command{
 	},
 }
 
-// ─── user balance / transactions（校园卡）─────────────────────
+// ─── user transactions（校园卡交易记录）──────────────────────
 
 var userCardSdate, userCardEdate string
-
-var userBalanceCmd = &cobra.Command{
-	Use:   "balance",
-	Short: "校园卡余额（取最近一笔交易的余额）",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return runJSON(func() (interface{}, error) {
-			s, err := newWfwService()
-			if err != nil {
-				return nil, err
-			}
-			h, err := s.FetchCardHistory("", "")
-			if err != nil {
-				return nil, err
-			}
-			return map[string]interface{}{
-				"balance":       h.Balance,
-				"balance_as_of": h.BalanceAsOf,
-				"txn_count":     h.TxnCount,
-			}, nil
-		})
-	},
-}
 
 var userTransactionsCmd = &cobra.Command{
 	Use:   "transactions",
@@ -400,7 +378,7 @@ func init() {
 	userOfflineCmd.Flags().StringVar(&userOfflineArgs.deviceID, "device-id", "", "设备 ID（user devices 输出的 device_id）")
 	userOfflineCmd.Flags().StringVar(&userOfflineArgs.ip, "ip", "", "设备 IP（user devices 输出的 ip）")
 
-	userCmd.AddCommand(userInfoCmd, userLabelsCmd, userDevicesCmd, userOfflineCmd, userBalanceCmd, userTransactionsCmd)
+	userCmd.AddCommand(userInfoCmd, userLabelsCmd, userDevicesCmd, userOfflineCmd, userTransactionsCmd)
 
 	q := balanceQueryCmd.Flags()
 	q.IntVar(&balanceQueryArgs.type_, "type", 1, "查询类型：1 照明电费，2 空调电费")
