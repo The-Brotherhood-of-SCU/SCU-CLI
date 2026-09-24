@@ -34,6 +34,20 @@ type Credentials struct {
 	CcylPrincipal string `json:"ccyl_principal,omitempty"`
 }
 
+// ConfigError 表示配置层错误（配置目录、凭据读写/解析）。
+// CLI 输出层据此归类 error.kind = "config"，与服务端/网络错误（service）
+// 区分开——AI 依赖该分类决定重试还是提示用户修本地环境。
+type ConfigError struct{ err error }
+
+func (e *ConfigError) Error() string { return e.err.Error() }
+func (e *ConfigError) Unwrap() error { return e.err }
+
+// IsConfigError 报告 err（或其包装链）是否为配置层错误。
+func IsConfigError(err error) bool {
+	var ce *ConfigError
+	return errors.As(err, &ce)
+}
+
 // Dir 返回配置目录，依次尝试 $SCU_CLI_CONFIG_DIR、os.UserConfigDir()/scu-cli。
 func Dir() (string, error) {
 	if d := os.Getenv("SCU_CLI_CONFIG_DIR"); d != "" {
@@ -41,7 +55,7 @@ func Dir() (string, error) {
 	}
 	base, err := os.UserConfigDir()
 	if err != nil {
-		return "", fmt.Errorf("无法确定用户配置目录: %w", err)
+		return "", &ConfigError{fmt.Errorf("无法确定用户配置目录: %w", err)}
 	}
 	return filepath.Join(base, "scu-cli"), nil
 }
@@ -65,11 +79,11 @@ func LoadCredentials() (*Credentials, error) {
 		return &Credentials{}, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("读取凭据失败: %w", err)
+		return nil, &ConfigError{fmt.Errorf("读取凭据失败: %w", err)}
 	}
 	var c Credentials
 	if err := json.Unmarshal(data, &c); err != nil {
-		return nil, fmt.Errorf("解析凭据失败: %w", err)
+		return nil, &ConfigError{fmt.Errorf("解析凭据失败: %w", err)}
 	}
 	return &c, nil
 }
@@ -81,18 +95,18 @@ func SaveCredentials(c *Credentials) error {
 		return err
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return fmt.Errorf("创建配置目录失败: %w", err)
+		return &ConfigError{fmt.Errorf("创建配置目录失败: %w", err)}
 	}
 	data, err := json.MarshalIndent(c, "", "  ")
 	if err != nil {
-		return err
+		return &ConfigError{err}
 	}
 	tmp := path + ".tmp"
 	if err := os.WriteFile(tmp, data, 0o600); err != nil {
-		return fmt.Errorf("写入凭据失败: %w", err)
+		return &ConfigError{fmt.Errorf("写入凭据失败: %w", err)}
 	}
 	if err := os.Rename(tmp, path); err != nil {
-		return fmt.Errorf("提交凭据失败: %w", err)
+		return &ConfigError{fmt.Errorf("提交凭据失败: %w", err)}
 	}
 	return nil
 }
@@ -104,7 +118,7 @@ func ClearCredentials() error {
 		return err
 	}
 	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("删除凭据失败: %w", err)
+		return &ConfigError{fmt.Errorf("删除凭据失败: %w", err)}
 	}
 	return nil
 }

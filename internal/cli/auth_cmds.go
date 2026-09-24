@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/The-Brotherhood-of-SCU/SCU-CLI/internal/auth"
 	"github.com/The-Brotherhood-of-SCU/SCU-CLI/internal/config"
@@ -176,12 +177,19 @@ func runWhoami(cmd *cobra.Command) error {
 			"message":   "未登录，请先执行 scu login",
 		})
 	}
-	return output.JSON(map[string]interface{}{
+	// login_time / expires_in_seconds 供调用方判断凭据新鲜度；
+	// 本地 TTL 到期不影响使用（请求时会自动续期）。
+	out := map[string]interface{}{
 		"logged_in": true,
 		"principal": a.Principal(),
 		"expired":   a.Expired(),
 		"message":   "已登录（expired 表示本地 TTL 到期，下次请求会自动续期）",
-	})
+	}
+	if lt := a.LoginTime(); !lt.IsZero() {
+		out["login_time"] = lt.Format(time.RFC3339)
+		out["expires_in_seconds"] = int(a.ExpiresIn().Seconds())
+	}
+	return output.JSON(out)
 }
 
 // captcha 命令：获取验证码（AI 两步登录的第一步）。

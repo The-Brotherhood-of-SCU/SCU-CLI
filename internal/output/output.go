@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 )
 
@@ -26,6 +27,17 @@ type Envelope struct {
 type ErrInfo struct {
 	Kind    string `json:"kind"`
 	Message string `json:"message"`
+}
+
+// compactOutput 报告是否输出单行紧凑 JSON。SCU_CLI_COMPACT 设为非空且
+// 非 "0"/"false" 时开启——面向 AI/脚本消费，省去缩进空白的多余 token；
+// 默认保持缩进格式，人类排障更易读。
+func compactOutput() bool {
+	switch os.Getenv("SCU_CLI_COMPACT") {
+	case "", "0", "false":
+		return false
+	}
+	return true
 }
 
 // JSON 将 data 以成功包层输出到 stdout。
@@ -53,8 +65,14 @@ func Fail(kind string, err error) error {
 }
 
 func write(e Envelope) error {
-	enc := json.NewEncoder(os.Stdout)
-	enc.SetIndent("", "  ")
+	return writeTo(os.Stdout, e)
+}
+
+func writeTo(w io.Writer, e Envelope) error {
+	enc := json.NewEncoder(w)
+	if !compactOutput() {
+		enc.SetIndent("", "  ")
+	}
 	enc.SetEscapeHTML(false)
 	if err := enc.Encode(e); err != nil {
 		return fmt.Errorf("输出 JSON 失败: %w", err)

@@ -62,7 +62,7 @@ scu login -u <学号> -p <密码>
 - 验证码由 CLI **内置本地 OCR 自动识别**，识别错误自动换新验证码重试（最多 5 次），不需要人工参与。
 - 登录态持久化在凭据文件（Linux/macOS `~/.config/scu-cli/`，Windows `%APPDATA%\scu-cli\`，0600 权限；可用 `SCU_CLI_CONFIG_DIR` 覆盖），本地 1 小时 TTL；过期后任何命令都会用保存的凭据 + OCR 静默重新登录，对你透明。
 - `-p` 会进入 shell 历史/进程列表；共享环境建议隔离 `SCU_CLI_CONFIG_DIR`。
-- 查状态：`scu whoami`（返回 principal 与本地 TTL 是否到期）；退出：`scu logout`（清除凭据）。
+- 查状态：`scu whoami`（返回 principal、本地 TTL 是否到期及剩余秒数 expires_in_seconds）；退出：`scu logout`（清除凭据）。
 - **非 TTY 保证**：所有交互式输入（学号/密码/人工验证码）仅在 stdin 是终端时才会发起，非 TTY 下立即报错退出、绝不阻塞——所以调用时必须把参数带齐。
 - 备用（OCR 连续失败时）：`scu captcha --solve` 取验证码（输出 `captcha_code` + OCR 结果 + 图片路径），再 `scu login -u <学号> --captcha-code <code> --captcha-text <文本>`。
 
@@ -82,7 +82,18 @@ scu login -u <学号> -p <密码>
 | `unauthenticated` | 未登录或会话失效且自动恢复失败 | 引导用户重新 `scu login` 后重试 |
 | `service` | 服务端业务错误 / 网络错误 | 按 message 判断，不要盲目重试 |
 | `login` | 登录阶段错误（验证码/密码错误等） | 修正后重试 |
-| `config` / `input` | 本地配置或输入错误 | 检查输入 |
+| `captcha` | 验证码获取/识别失败 | 用 `scu captcha --solve` 人工通道重试 |
+| `logout` | 清除本地凭据失败 | 检查配置目录权限 |
+| `config` | 本地配置/凭据文件错误 | 检查配置目录（必要时删除凭据文件重新 login），不要重试 |
+| `input` | 命令参数缺失/格式错误 | 按 message 修正参数，不要重试 |
+
+环境变量（按需设置，均有默认值）：
+
+| 变量 | 作用 |
+|---|---|
+| `SCU_CLI_CONFIG_DIR` | 覆盖配置目录（凭据、快照存放位置） |
+| `SCU_CLI_TIMEOUT` | 单次 HTTP 请求超时秒数（默认 30；校园网不通时快速报错而非挂起） |
+| `SCU_CLI_COMPACT` | 设为 `1` 输出单行紧凑 JSON（省 token；默认缩进便于人工排障） |
 
 ## 4. 参数发现链（所有 num/id/code 都不用猜）
 

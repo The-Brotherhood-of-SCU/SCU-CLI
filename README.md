@@ -42,7 +42,9 @@ stdout 恒为单个 JSON 对象，诊断信息走 stderr：
 {"ok": false, "error": {"kind": "unauthenticated", "message": "..."}}
 ```
 
-失败时退出码非 0。`error.kind`：`unauthenticated`（重新 `scu login`）、`login`（登录阶段错误）、`service`（服务端/网络错误）、`config` / `input`（本地输入错误）。
+失败时退出码非 0。`error.kind`：`unauthenticated`（重新 `scu login`）、`login`（登录阶段错误）、`captcha`（验证码获取/识别失败）、`logout`（清除凭据失败）、`service`（服务端/网络错误）、`config`（本地配置/凭据错误）、`input`（本地输入错误）。
+
+环境变量：`SCU_CLI_CONFIG_DIR` 覆盖配置目录；`SCU_CLI_TIMEOUT` 覆盖单次 HTTP 请求超时秒数（默认 30，防止校园网不通时挂起）；`SCU_CLI_COMPACT=1` 输出单行紧凑 JSON（面向 AI/脚本，省 token）。
 
 ## 功能一览(详情请查看skill)
 

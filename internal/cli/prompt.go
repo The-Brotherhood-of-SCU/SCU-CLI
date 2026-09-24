@@ -22,14 +22,17 @@ func stdinIsTerminal() bool {
 	return term.IsTerminal(int(os.Stdin.Fd()))
 }
 
+// stdinReader 是全进程共享的 stdin 读取器。promptLine 每次新建
+// bufio.Reader 会把上一调用预读进缓冲的输入丢弃（粘贴多行时丢第二行）。
+var stdinReader = bufio.NewReader(os.Stdin)
+
 // promptLine 从 stdin 读取一行文本。仅在交互终端下可用。
 func promptLine(label string) (string, error) {
 	if !stdinIsTerminal() {
 		return "", ErrNonInteractive
 	}
 	fmt.Fprintf(os.Stderr, "%s: ", label)
-	reader := bufio.NewReader(os.Stdin)
-	line, err := reader.ReadString('\n')
+	line, err := stdinReader.ReadString('\n')
 	if err != nil {
 		return "", err
 	}

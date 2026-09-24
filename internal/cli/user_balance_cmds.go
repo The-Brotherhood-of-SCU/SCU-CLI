@@ -73,10 +73,11 @@ var userOfflineCmd = &cobra.Command{
 	Use:   "offline",
 	Short: "强制指定校园网设备下线（--device-id / --ip 取自 user devices 输出）",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// 本地输入校验直接走 input kind；经 runJSON 会被误标为 service。
+		if userOfflineArgs.deviceID == "" || userOfflineArgs.ip == "" {
+			return output.Fail("input", errors.New("必须提供 --device-id 与 --ip（取自 user devices 输出）"))
+		}
 		return runJSON(func() (interface{}, error) {
-			if userOfflineArgs.deviceID == "" || userOfflineArgs.ip == "" {
-				return nil, errors.New("必须提供 --device-id 与 --ip（取自 user devices 输出）")
-			}
 			s, err := newWfwService()
 			if err != nil {
 				return nil, err

@@ -68,6 +68,14 @@ func NewScuAuth() (*ScuAuth, error) {
 // Principal 返回当前账号（学号）。
 func (a *ScuAuth) Principal() string { return a.creds.Principal }
 
+// LoginTime 返回最近一次登录/刷新成功的时间（未登录时为零值）。
+func (a *ScuAuth) LoginTime() time.Time { return a.creds.LoginTime }
+
+// ExpiresIn 返回本地 TTL 剩余时间（已过期时为负值）。
+func (a *ScuAuth) ExpiresIn() time.Duration {
+	return time.Until(a.creds.LoginTime.Add(sessionTTLSec * time.Second))
+}
+
 // LoggedIn 报告是否存在可用 token（不代表未过期）。
 func (a *ScuAuth) LoggedIn() bool { return a.creds.Token != "" }
 

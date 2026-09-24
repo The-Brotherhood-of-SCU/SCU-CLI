@@ -6,14 +6,32 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"os"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/go-resty/resty/v2"
 )
 
 // DefaultUserAgent 与 Bugaoshan 一致，部分后端校验 UA。
 const DefaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0"
+
+// defaultTimeout 是单次 HTTP 请求的默认超时。不设超时的话，校园网不通
+// （如不在校园网/VPN）或服务端挂起时 CLI 会永久阻塞——对 AI agent 的
+// bash 调用而言，一条干净的 JSON 超时错误远好于挂死。
+const defaultTimeout = 30 * time.Second
+
+// requestTimeout 返回单次请求超时；SCU_CLI_TIMEOUT（秒）可覆盖。
+func requestTimeout() time.Duration {
+	if v := os.Getenv("SCU_CLI_TIMEOUT"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return time.Duration(n) * time.Second
+		}
+	}
+	return defaultTimeout
+}
 
 // maxRedirects 是 SSO 手动重定向的最大跳数。
 const maxRedirects = 10
@@ -63,6 +81,7 @@ func (c *CookieClient) newRestyClient() *resty.Client {
 	rc := resty.New()
 	rc.SetCookieJar(c.jar)
 	rc.SetHeader("User-Agent", DefaultUserAgent)
+	rc.SetTimeout(requestTimeout())
 	// 禁用自动重定向，改为手动逐跳跟随。
 	// 必须返回 http.ErrUseLastResponse 哨兵：net/http 收到它会把 3xx
 	// 作为正常响应返回（err == nil），由上层读 Location 继续跟随。

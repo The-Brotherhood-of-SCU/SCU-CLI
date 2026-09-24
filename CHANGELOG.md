@@ -9,6 +9,15 @@
 ### 新增
 
 - `scu user transactions`：校园卡扣费/充值明细（数据源：微服务电子卡交易记录 `cardhis/wap/default/get-index`，支持 `--sdate/--edate` 区间过滤，输出每日消费合计与最新余额；余额本身已含于 `scu user labels`，故不设独立 balance 命令）
+- `SCU_CLI_TIMEOUT` 环境变量：覆盖单次 HTTP 请求超时秒数；`SCU_CLI_COMPACT=1`：输出单行紧凑 JSON（面向 AI/脚本省 token，默认仍为缩进格式）
+- `scu whoami` 输出补充 `login_time` 与 `expires_in_seconds`（本地 TTL 剩余秒数，过期为负），供调用方判断凭据新鲜度
+
+### 修复
+
+- 共享传输层增加默认 30s 请求超时：此前校园网不通（不在校内/VPN 未连）或服务端挂起时命令会永久阻塞，现快速返回 `service` 错误包层
+- 错误分类修正：凭据/配置文件读写解析失败（如 credentials.json 损坏）由误标的 `service` 修正为 `config`；`scu user offline` 缺参错误由误标的 `service` 修正为 `input`——AI 依赖 error.kind 区分重试与修本地环境
+- 交互输入共享 stdin 读取器：修复连续多次 prompt 时 bufio 预读缓冲可能吞掉后续输入（如粘贴多行）的问题
+- README/SKILL 补齐 `error.kind` 文档：补充实际在用的 `captcha`、`logout` 分类，`config` 与 `input` 分开说明
 
 ## [0.5.1] - 2026-09-16
 

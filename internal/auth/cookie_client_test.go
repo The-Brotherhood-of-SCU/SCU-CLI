@@ -3,8 +3,10 @@ package auth
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestDoReturnsRedirectAsResponse 3xx 必须作为正常响应返回（err == nil），
@@ -136,5 +138,53 @@ func TestFollowRedirectsStripsSensitiveHeadersCrossOrigin(t *testing.T) {
 	}
 	if !bGotAuth {
 		t.Error("AllowSensitiveOrigin 后跨源应转发 Authorization")
+	}
+}
+
+// TestRequestTimeoutEnvOverride SCU_CLI_TIMEOUT 环境变量覆盖单次请求超时。
+func TestRequestTimeoutEnvOverride(t *testing.T) {
+	cases := []struct {
+		env  string
+		want time.Duration
+	}{
+		{"5", 5 * time.Second},
+		{"", defaultTimeout},
+		{"bogus", defaultTimeout},
+		{"-3", defaultTimeout},
+		{"0", defaultTimeout},
+	}
+	for _, tc := range cases {
+		if tc.env == "" {
+			t.Setenv("SCU_CLI_TIMEOUT", "")
+			os.Unsetenv("SCU_CLI_TIMEOUT")
+		} else {
+			t.Setenv("SCU_CLI_TIMEOUT", tc.env)
+		}
+		if got := requestTimeout(); got != tc.want {
+			t.Errorf("SCU_CLI_TIMEOUT=%q: requestTimeout() = %v, want %v", tc.env, got, tc.want)
+		}
+	}
+}
+
+// TestDoTimesOut 请求超过配置超时必须返回错误而非永久挂起
+// （Do 的传输层重试会用同样的超时重发一次，总耗时仍有限）。
+func TestDoTimesOut(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(3 * time.Second)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	t.Setenv("SCU_CLI_TIMEOUT", "1")
+	c, err := NewCookieClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := time.Now()
+	if _, err := c.Get(srv.URL+"/x", nil); err == nil {
+		t.Fatal("超时请求应返回错误")
+	}
+	if elapsed := time.Since(start); elapsed >= 3*time.Second {
+		t.Fatalf("超时未生效: 耗时 %v", elapsed)
 	}
 }
