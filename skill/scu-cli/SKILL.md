@@ -159,6 +159,7 @@ scu user info       # 基本信息（realname 姓名、role.number 学号等）
 scu user labels     # 用户标签
 scu user devices    # 校园网在线设备（输出 device_id / ip）
 scu user offline --device-id <id> --ip <ip>   # 强制指定设备下线（参数取自 devices 输出）
+scu user transactions [--sdate YYYY-MM-DD] [--edate YYYY-MM-DD]   # 校园卡扣费/充值明细（日期可省略，省略时服务端返回最近几天；输出 transactions 平铺明细 + by_day 每日消费合计 + total_cost/balance。余额字段取自最近一笔交易，余额本身也可经 scu user labels 查看）
 ```
 
 ## 7. 缴费平台 `scu balance`

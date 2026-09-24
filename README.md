@@ -76,6 +76,7 @@ stdout 恒为单个 JSON 对象，诊断信息走 stderr：
 |---|---|
 | `info` / `labels` / `devices` | 基本信息 / 用户标签 / 校园网在线设备 |
 | `offline --device-id <id> --ip <ip>` | 强制指定校园网设备下线（参数取自 devices 输出） |
+| `transactions [--sdate …] [--edate …]` | 校园卡扣费/充值明细（数据源：电子卡交易记录 cardhis；日期可省略，输出每日合计、总消费与最新余额） |
 
 ### 电费 `scu balance`
 

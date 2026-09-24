@@ -35,3 +35,4 @@ bin/scu
 # Editor/IDE
 # .idea/
 # .vscode/
+/scu

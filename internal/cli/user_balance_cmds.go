@@ -93,6 +93,29 @@ var userOfflineCmd = &cobra.Command{
 	},
 }
 
+// ─── user transactions（校园卡交易记录）──────────────────────
+
+var userCardSdate, userCardEdate string
+
+var userTransactionsCmd = &cobra.Command{
+	Use:   "transactions",
+	Short: "校园卡扣费/充值明细（--sdate/--edate 均可省略，省略时服务端返回最近几天）",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runJSON(func() (interface{}, error) {
+			s, err := newWfwService()
+			if err != nil {
+				return nil, err
+			}
+			return s.FetchCardHistory(userCardSdate, userCardEdate)
+		})
+	},
+}
+
+func init() {
+	userTransactionsCmd.Flags().StringVar(&userCardSdate, "sdate", "", "起始日期 YYYY-MM-DD")
+	userTransactionsCmd.Flags().StringVar(&userCardEdate, "edate", "", "结束日期 YYYY-MM-DD")
+}
+
 // ─── balance 命令组 ─────────────────────────────────────────────
 
 // newPayAppService 构造缴费平台服务（PayApp 依赖 WFW 认证）。
@@ -355,7 +378,7 @@ func init() {
 	userOfflineCmd.Flags().StringVar(&userOfflineArgs.deviceID, "device-id", "", "设备 ID（user devices 输出的 device_id）")
 	userOfflineCmd.Flags().StringVar(&userOfflineArgs.ip, "ip", "", "设备 IP（user devices 输出的 ip）")
 
-	userCmd.AddCommand(userInfoCmd, userLabelsCmd, userDevicesCmd, userOfflineCmd)
+	userCmd.AddCommand(userInfoCmd, userLabelsCmd, userDevicesCmd, userOfflineCmd, userTransactionsCmd)
 
 	q := balanceQueryCmd.Flags()
 	q.IntVar(&balanceQueryArgs.type_, "type", 1, "查询类型：1 照明电费，2 空调电费")
