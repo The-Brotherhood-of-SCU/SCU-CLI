@@ -1,0 +1,16 @@
+{
+  "colorA3": {
+    "jobId": 139082,
+    "code": 0,
+    "dimensions": [
+      2105,
+      2977
+    ],
+    "bytes": 75215,
+    "redPixels": 62128,
+    "bluePixels": 62304
+  },
+  "blackPreview": {
+    "chromaticPixels": 0
+  }
+}

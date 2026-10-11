@@ -1,0 +1,106 @@
+{
+  "fixture": "scu-probe-short-edge.pdf",
+  "settings": {
+    "radio": [
+      "黑白",
+      "A4",
+      "双面长边",
+      "全部"
+    ],
+    "wire_duplex": 3
+  },
+  "before_form": [
+    [
+      "szPath",
+      {
+        "name": "scu-probe-short-edge.pdf",
+        "size": 1933,
+        "type": "application/pdf"
+      }
+    ],
+    [
+      "dwColor",
+      "1"
+    ],
+    [
+      "dwPaperId",
+      "9"
+    ],
+    [
+      "dwDuplex",
+      "3"
+    ],
+    [
+      "dwFrom",
+      "0"
+    ],
+    [
+      "dwCopies",
+      "1"
+    ],
+    [
+      "BackURL",
+      "http://202.115.54.240/client/new/cprintPc/printDoc.html?t=1791702933986"
+    ]
+  ],
+  "xhr": [
+    {
+      "id": "1791702934252-0.3393772937562556",
+      "method": "POST",
+      "url": "/api/client/CloudPrint/Upload",
+      "fields": [
+        [
+          "szPath",
+          {
+            "name": "scu-probe-short-edge.pdf",
+            "size": 1933,
+            "type": "application/pdf"
+          }
+        ],
+        [
+          "dwColor",
+          "1"
+        ],
+        [
+          "dwPaperId",
+          "9"
+        ],
+        [
+          "dwDuplex",
+          "3"
+        ],
+        [
+          "dwFrom",
+          "0"
+        ],
+        [
+          "dwCopies",
+          "1"
+        ],
+        [
+          "BackURL",
+          "http://202.115.54.240/client/new/cprintPc/printDoc.html?t=1791702933986"
+        ],
+        [
+          "dwTo",
+          "0"
+        ]
+      ],
+      "status": 200,
+      "finalURL": "http://202.115.54.240/client/new/cprintPc/printDoc.html?t=1791702933986&code=0&fee=40&message=",
+      "completed": true
+    }
+  ],
+  "job": {
+    "dwJobId": 139084,
+    "dwOldJobId": 139084,
+    "dwCreateTime": 151536,
+    "name": "scu-probe-short-edge.pdf",
+    "dwPages": 4,
+    "dwCopies": 1,
+    "dwStatus": 1,
+    "dwFee": 0,
+    "szAttribe": "hdup,",
+    "szPaperDetail": "[{\"dwPaperID\":9,\"dwBWPages\":4,\"dwColorPages\":0,\"dwPaperNum\":2}]"
+  }
+}

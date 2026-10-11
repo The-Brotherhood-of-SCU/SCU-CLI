@@ -1,0 +1,15 @@
+{
+  "date": "2026-10-11",
+  "base_url": "http://202.115.54.240",
+  "capture_scope": "Sanitized browser observations; no raw upload POST retained",
+  "before": {"code": 0, "job_count": 0},
+  "submitted_file": {"type": "application/pdf", "size_bytes": 174715, "filename": "redacted", "content_read": false},
+  "form_before_submit": {"dwColor": "1", "dwPaperId": "9", "dwDuplex": "1", "dwFrom": "0", "dwCopies": "1", "BackURL": "http://202.115.54.240/client/new/cprintPc/printDoc.html?t=<timestamp>"},
+  "inferred_js_added_fields": {"dwTo": "0"},
+  "observed_final_response": {"method": "GET", "status": 200, "path": "/client/new/cprintPc/printDoc.html", "query": {"t": "redacted", "code": "0", "fee": "20", "message": ""}},
+  "after": {"code": 0, "job_count": 1, "result": [{"dwJobId": 139077, "dwOldJobId": 139077, "dwStatus": 1, "dwCopies": 1, "dwPages": 2, "dwFee": 0, "dwType": 2, "szAttribe": "single,", "szPaperDetail": "[{\"dwPaperID\":9,\"dwBWPages\":2,\"dwColorPages\":0,\"dwPaperNum\":2}]"}]},
+  "auth_check": {"code": 0, "has_session_id": true, "visible_auth_cookie_names": ["OSESSIONID"]},
+  "side_effects": {"uploads": 1, "print_executed": false, "payment_executed": false, "delete_executed": false},
+  "cli_sso_tested": false,
+  "limitations": ["Raw multipart POST and original redirect status/Location not retained by WebBridge", "Fee unit and billing timing unverified", "Duplex edge semantics unverified"]
+}

@@ -1,0 +1,109 @@
+{
+  "fixture": "scu-probe-color-a3.pdf",
+  "settings": {
+    "radio": [
+      "彩色",
+      "A3",
+      "单面",
+      "部分"
+    ],
+    "fill": {
+      "#dwFrom": "1",
+      "#dwTo": "1"
+    }
+  },
+  "before_form": [
+    [
+      "szPath",
+      {
+        "name": "scu-probe-color-a3.pdf",
+        "size": 1933,
+        "type": "application/pdf"
+      }
+    ],
+    [
+      "dwColor",
+      "2"
+    ],
+    [
+      "dwPaperId",
+      "8"
+    ],
+    [
+      "dwDuplex",
+      "1"
+    ],
+    [
+      "dwFrom",
+      "1"
+    ],
+    [
+      "dwCopies",
+      "1"
+    ],
+    [
+      "BackURL",
+      "http://202.115.54.240/client/new/cprintPc/printDoc.html?t=1791702879547"
+    ]
+  ],
+  "xhr": [
+    {
+      "id": "1791702879827-0.4243492864932925",
+      "method": "POST",
+      "url": "/api/client/CloudPrint/Upload",
+      "fields": [
+        [
+          "szPath",
+          {
+            "name": "scu-probe-color-a3.pdf",
+            "size": 1933,
+            "type": "application/pdf"
+          }
+        ],
+        [
+          "dwColor",
+          "2"
+        ],
+        [
+          "dwPaperId",
+          "8"
+        ],
+        [
+          "dwDuplex",
+          "1"
+        ],
+        [
+          "dwFrom",
+          "1"
+        ],
+        [
+          "dwCopies",
+          "1"
+        ],
+        [
+          "BackURL",
+          "http://202.115.54.240/client/new/cprintPc/printDoc.html?t=1791702879547"
+        ],
+        [
+          "dwTo",
+          "1"
+        ]
+      ],
+      "status": 200,
+      "finalURL": "http://202.115.54.240/client/new/cprintPc/printDoc.html?t=1791702879547&code=0&message=",
+      "completed": true
+    }
+  ],
+  "job": {
+    "dwJobId": 139082,
+    "dwOldJobId": 139082,
+    "dwCreateTime": 151443,
+    "name": "scu-probe-color-a3.pdf",
+    "dwPages": 1,
+    "dwCopies": 1,
+    "dwStatus": 1,
+    "dwFee": 0,
+    "szAttribe": "single,color,",
+    "szPaperDetail": "[{\"dwPaperID\":8,\"dwBWPages\":0,\"dwColorPages\":1,\"dwPaperNum\":1}]"
+  }
+}

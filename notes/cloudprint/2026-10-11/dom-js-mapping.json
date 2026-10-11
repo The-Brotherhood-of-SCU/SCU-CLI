@@ -1,0 +1,127 @@
+{
+  "mapping": {
+    "language": [
+      {
+        "dwLanSN": 2,
+        "dwSubSysSN": 6,
+        "dwTextID": 640025,
+        "szTextInfo": "Simplex",
+        "szMemo": ""
+      },
+      {
+        "dwLanSN": 1,
+        "dwSubSysSN": 6,
+        "dwTextID": 640027,
+        "szTextInfo": "双面短边",
+        "szMemo": ""
+      },
+      {
+        "dwLanSN": 2,
+        "dwSubSysSN": 6,
+        "dwTextID": 640026,
+        "szTextInfo": "Duplex(Long Edge)",
+        "szMemo": ""
+      },
+      {
+        "dwLanSN": 2,
+        "dwSubSysSN": 6,
+        "dwTextID": 640027,
+        "szTextInfo": "Duplex(Short Edge)",
+        "szMemo": ""
+      },
+      {
+        "dwLanSN": 1,
+        "dwSubSysSN": 6,
+        "dwTextID": 640025,
+        "szTextInfo": "单面",
+        "szMemo": ""
+      },
+      {
+        "dwLanSN": 1,
+        "dwSubSysSN": 6,
+        "dwTextID": 640026,
+        "szTextInfo": "双面长边",
+        "szMemo": ""
+      }
+    ]
+  },
+  "dom": {
+    "radios": [
+      {
+        "name": "dwColor",
+        "value": "1",
+        "text": "黑白",
+        "textID": "640029"
+      },
+      {
+        "name": "dwColor",
+        "value": "2",
+        "text": "彩色",
+        "textID": "640030"
+      },
+      {
+        "name": "dwPaperId",
+        "value": "-1",
+        "text": "按原文档纸型打印",
+        "textID": "640401"
+      },
+      {
+        "name": "dwPaperId",
+        "value": "9",
+        "text": "A4"
+      },
+      {
+        "name": "dwPaperId",
+        "value": "8",
+        "text": "A3"
+      },
+      {
+        "name": "dwDuplex",
+        "value": "1",
+        "text": "单面",
+        "textID": "640025"
+      },
+      {
+        "name": "dwDuplex",
+        "value": "2",
+        "text": "双面长边",
+        "textID": "640026"
+      },
+      {
+        "name": "dwFrom",
+        "value": "0",
+        "text": "全部",
+        "textID": "641002"
+      },
+      {
+        "name": "dwFrom",
+        "value": "1",
+        "text": "部分",
+        "textID": "641003"
+      }
+    ],
+    "rangeInputs": [
+      {
+        "id": "dwFrom",
+        "name": ""
+      },
+      {
+        "id": "dwTo",
+        "name": ""
+      }
+    ],
+    "formHandler": "function () {\r\n            if (!$(this).parent().hasClass(\"pagestyle\")) {\r\n                $(this).siblings(\".style-input\").addClass(\"active\");\r\n                $(this).parent().siblings(\".radio\").find(\".style-input\").removeClass(\"active\");\r\n                if ($(this).parent().next().hasClass(\"none\")) {\r\n                    $(this).parent().next().removeClass(\"none\");\r\n                } else {\r\n                    $(this).parent().siblings(\".pagestyle\").addClass(\"none\");\r\n                    $(\"#dwFrom\").val(1);\r\n\t\t\t\t\t$(\"#dwTo\").val(1);\r\n                }\r\n            }\r\n            // $(this).parent().next().removeClass(\"none\");\r\n            // $(this).parent().siblings(\".range\").next().addClass(\"none\");\r\n        }"
+  },
+  "rangeReset": {
+    "actions": "set range 2-3, then change copies to 2 with input/change events",
+    "before": {
+      "from": "2",
+      "to": "3"
+    },
+    "after": {
+      "from": "1",
+      "to": "1",
+      "copies": "2"
+    }
+  }
+}

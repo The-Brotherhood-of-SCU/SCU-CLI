@@ -1,0 +1,110 @@
+{
+  "fixture": "scu-probe-duplex-range.pdf",
+  "settings": {
+    "radio": [
+      "黑白",
+      "A4",
+      "双面长边",
+      "部分"
+    ],
+    "fill": {
+      "#dwFrom": "2",
+      "#dwTo": "3",
+      "#dwCopies": "2"
+    }
+  },
+  "before_form": [
+    [
+      "szPath",
+      {
+        "name": "scu-probe-duplex-range.pdf",
+        "size": 1933,
+        "type": "application/pdf"
+      }
+    ],
+    [
+      "dwColor",
+      "1"
+    ],
+    [
+      "dwPaperId",
+      "9"
+    ],
+    [
+      "dwDuplex",
+      "2"
+    ],
+    [
+      "dwFrom",
+      "1"
+    ],
+    [
+      "dwCopies",
+      "2"
+    ],
+    [
+      "BackURL",
+      "http://202.115.54.240/client/new/cprintPc/printDoc.html?t=1791702876946"
+    ]
+  ],
+  "xhr": [
+    {
+      "id": "1791702877220-0.680674479694139",
+      "method": "POST",
+      "url": "/api/client/CloudPrint/Upload",
+      "fields": [
+        [
+          "szPath",
+          {
+            "name": "scu-probe-duplex-range.pdf",
+            "size": 1933,
+            "type": "application/pdf"
+          }
+        ],
+        [
+          "dwColor",
+          "1"
+        ],
+        [
+          "dwPaperId",
+          "9"
+        ],
+        [
+          "dwDuplex",
+          "2"
+        ],
+        [
+          "dwFrom",
+          "1"
+        ],
+        [
+          "dwCopies",
+          "2"
+        ],
+        [
+          "BackURL",
+          "http://202.115.54.240/client/new/cprintPc/printDoc.html?t=1791702876946"
+        ],
+        [
+          "dwTo",
+          "1"
+        ]
+      ],
+      "status": 200,
+      "finalURL": "http://202.115.54.240/client/new/cprintPc/printDoc.html?t=1791702876946&code=0&fee=20&message=",
+      "completed": true
+    }
+  ],
+  "job": {
+    "dwJobId": 139081,
+    "dwOldJobId": 139081,
+    "dwCreateTime": 151438,
+    "name": "scu-probe-duplex-range.pdf",
+    "dwPages": 1,
+    "dwCopies": 2,
+    "dwStatus": 1,
+    "dwFee": 0,
+    "szAttribe": "vdup,",
+    "szPaperDetail": "[{\"dwPaperID\":9,\"dwBWPages\":1,\"dwColorPages\":0,\"dwPaperNum\":1}]"
+  }
+}
