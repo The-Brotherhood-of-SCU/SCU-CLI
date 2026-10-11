@@ -1,10 +1,10 @@
 ---
 name: scu-cli
-description: 使用 scu CLI 操作四川大学校园服务（教务课表/成绩/考表/教室/培养方案/校历、电费余额、体测成绩、第二课堂活动/报名/学分等）。当用户是四川大学学生或教职工，需要查询或操作校园服务时使用。需要先安装 scu 二进制并完成统一认证登录。
+description: 使用 scu CLI 操作四川大学校园服务（教务课表/成绩/考表/教室/培养方案/校历、电费余额、体测成绩、第二课堂活动/报名/学分、图书馆云打印文件上传等）。当用户是四川大学学生或教职工，需要查询或操作校园服务时使用。需要先安装 scu 二进制并完成统一认证登录；云打印 dry-run 可离线使用。
 slug: scu-cli
 displayName: 四川大学校园服务 CLI
 version: 0.5.0
-summary: 四川大学校园服务命令行 Skill——教务课表/成绩/考表/校历/课程课表（支持 ICS 导出）、电费余额与消耗趋势、体测成绩、第二课堂活动/报名/学分、办事大厅事项查询与动态表单提交、智慧后勤在线报修、校园网无感认证管理。
+summary: 四川大学校园服务命令行 Skill——教务课表/成绩/考表/校历/课程课表（支持 ICS 导出）、电费余额与消耗趋势、体测成绩、第二课堂活动/报名/学分、办事大厅事项查询与动态表单提交、智慧后勤在线报修、校园网无感认证管理、图书馆云打印上传与任务查询。
 license: AGPL-3.0-only
 tags:
   - scu
@@ -16,7 +16,7 @@ homepage: https://github.com/The-Brotherhood-of-SCU/SCU-CLI
 
 # SCU-CLI：四川大学校园服务命令行
 
-`scu` 把四川大学各类校园服务封装成机器可读的命令行，面向 AI 与脚本设计。统一认证登录后，教务/微服务/缴费/体测/第二课堂的子系统 SSO 由 CLI 自动建立，会话过期自动重新认证并重放请求一次——这些对你完全透明，只需调用业务命令。
+`scu` 把四川大学各类校园服务封装成机器可读的命令行，面向 AI 与脚本设计。统一认证登录后，教务/微服务/缴费/体测/第二课堂/云打印的子系统 SSO 由 CLI 自动建立。查询请求认证失效时可重新认证并重试一次；云打印文件上传提交后不自动重放，结果不确定时先查任务列表。
 
 ## 1. 安装 CLI
 
@@ -86,6 +86,7 @@ scu login -u <学号> -p <密码>
 | `logout` | 清除本地凭据失败 | 检查配置目录权限 |
 | `config` | 本地配置/凭据文件错误 | 检查配置目录（必要时删除凭据文件重新 login），不要重试 |
 | `input` | 命令参数缺失/格式错误 | 按 message 修正参数，不要重试 |
+| `upload_uncertain` | 云打印服务器可能已接收文件，但上传结果未确认 | 先用 `scu cloudprint jobs` 核对任务，禁止直接重试 |
 
 环境变量（按需设置，均有默认值）：
 
@@ -309,7 +310,26 @@ scu passpoint cancel --mac B8782EBDCE85   # 取消绑定（mac 取自 devices）
 
 MAC 为 12 位十六进制、无分隔符、大写（如 B8782EBDCE85）；冒号/连字符小写写法会自动归一化，位数不对报 input 错误。`add`/`cancel` 为写操作，执行前确认。
 
-## 13. 行为准则
+## 13. 图书馆云打印 `scu cloudprint`
+
+```bash
+scu cloudprint check           # 验证 SCU → libic/CAS → 打印系统会话
+scu cloudprint upload './document.pdf'
+scu cloudprint upload --file './document.pdf' --color color --paper a3 --duplex long-edge --copies 2 --pages 2-3
+scu cloudprint upload './document.pdf' --duplex short-edge --pages 4 --dry-run
+scu cloudprint jobs            # list 为别名
+```
+
+- 默认 `--color bw --paper a4 --duplex long-edge --copies 1 --pages all`（A4 黑白长边双面）。颜色为 `bw/color`，纸型为 `a4/a3/original`，单双面为 `simplex/long-edge/short-edge`；页范围为 `all`、单页或连续区间。
+- 文件路径可用位置参数或 `--file`，不能同时提供。WSL 可用 `/mnt/c/...`，也会将引号包裹的 `C:\...` 转成挂载路径。路径含空格时加引号。
+- `--dry-run` 只验证本地文件并返回 protocol fields，不要求登录。非空普通文件及格式后缀先做本地检查，格式转换由服务器负责；大文件可设置 `SCU_CLI_TIMEOUT=120`。
+- 使用 `scu login` 的已有凭据；不另存图书馆密码或输出 SessionId。上传只创建云打印任务，实际打印由用户在馆内刷卡确认。
+- 按用户已授权的文件与设置执行上传；已有明确授权时无需重复确认。
+- 上传 POST 永不自动重放。`upload_uncertain` 表示可能已成功，先用 `jobs` 核对；上传后的 `unauthenticated` 同样先核对列表，再决定是否重试。
+- 成功输出 `status=uploaded`、`verification`、`jobs`；`matched_new_job` 为一个新增同名任务，`pending`/`ambiguous` 查看 `warning`。`jobs` 的 `szPaperDetail` 已解析；页数和纸张数为每份，`dwCopies` 另计。
+- `fee_raw` 单位未确认，不能解释成已扣费。打印接口使用 HTTP。
+
+## 14. 行为准则
 
 - **写操作先确认**：`ccyl signup/cancel/subscribe/unsubscribe/export`、`user offline`、`service submit`（先 --dry-run 给用户看提交体）、`repair submit`（先 --dry-run）/`withdraw`/`evaluate`/`save-address`、`passpoint add`/`cancel`、`balance query` 首次绑房等写操作，执行前向用户确认目标与参数；失败后不要自动重试（CLI 自身也不会重放写请求），先把错误报给用户。
 - 只读命令可自由串行调用；优先用发现链逐级取 ID，不要向用户索要可以自动发现的编号。

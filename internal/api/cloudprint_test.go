@@ -1,0 +1,205 @@
+package api
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync/atomic"
+	"testing"
+
+	"github.com/The-Brotherhood-of-SCU/SCU-CLI/internal/auth"
+)
+
+type cloudPrintTestAuth struct {
+	client        *auth.CookieClient
+	invalidations int
+}
+
+func (a *cloudPrintTestAuth) ModuleID() string                       { return "cloudprint" }
+func (a *cloudPrintTestAuth) GetClient() (*auth.CookieClient, error) { return a.client, nil }
+func (a *cloudPrintTestAuth) Invalidate()                            { a.invalidations++ }
+
+func cloudPrintFixture(t *testing.T) (*os.File, os.FileInfo) {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "测试 document.pdf")
+	if err := os.WriteFile(path, []byte("%PDF-1.4\nfixture document\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	f, info, err := OpenCloudPrintFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { f.Close() })
+	return f, info
+}
+
+func TestCloudPrintOptionsMatchInvestigatedProtocol(t *testing.T) {
+	for _, tc := range []struct {
+		color, paper, duplex, pages string
+		copies                      int
+		want                        map[string]string
+	}{
+		{"bw", "a4", "simplex", "all", 1, map[string]string{"dwColor": "1", "dwPaperId": "9", "dwDuplex": "1", "dwCopies": "1", "dwFrom": "0", "dwTo": "0"}},
+		{"color", "a3", "long-edge", "2-3", 2, map[string]string{"dwColor": "2", "dwPaperId": "8", "dwDuplex": "2", "dwCopies": "2", "dwFrom": "2", "dwTo": "3"}},
+		{"bw", "original", "short-edge", "4", 1, map[string]string{"dwColor": "1", "dwPaperId": "-1", "dwDuplex": "3", "dwCopies": "1", "dwFrom": "4", "dwTo": "4"}},
+	} {
+		got, err := (CloudPrintOptions{Color: tc.color, Paper: tc.paper, Duplex: tc.duplex, Pages: tc.pages, Copies: tc.copies}).Fields()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for key, want := range tc.want {
+			if got[key] != want {
+				t.Errorf("%s=%s, want %s", key, got[key], want)
+			}
+		}
+	}
+	for _, pages := range []string{"0", "3-2", "1,3", "-1", "", "1-2-3", "1-", "4294967296"} {
+		if _, err := (CloudPrintOptions{Color: "bw", Paper: "a4", Duplex: "simplex", Copies: 1, Pages: pages}).Fields(); err == nil {
+			t.Errorf("accepted invalid range %q", pages)
+		}
+	}
+}
+
+func TestCloudPrintUploadStreamsCorrectFormAndMatchesNewJob(t *testing.T) {
+	f, info := cloudPrintFixture(t)
+	var posts atomic.Int32
+	var base string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "" {
+			t.Error("print upload must not carry SCU Bearer")
+		}
+		switch r.URL.Path {
+		case "/api/client/Auth/Check":
+			fmt.Fprint(w, `{"code":0,"SessionId":"session"}`)
+		case "/api/client/PrintJob/Get":
+			jobs := []map[string]interface{}{{"dwJobId": 100, "szJobName": info.Name()}}
+			if posts.Load() > 0 {
+				jobs = append(jobs, map[string]interface{}{"dwJobId": 101, "szJobName": info.Name(), "dwCopies": 2, "szTrueName": "PRIVATE", "szCardNO": "PRIVATE", "szFileName": "PRIVATE", "szPaperDetail": `[{"dwPaperID":8,"dwBWPages":0,"dwColorPages":2,"dwPaperNum":1}]`})
+			}
+			json.NewEncoder(w).Encode(map[string]interface{}{"code": 0, "result": jobs})
+		case "/api/client/CloudPrint/Upload":
+			posts.Add(1)
+			if r.ContentLength <= info.Size() || len(r.TransferEncoding) != 0 {
+				t.Error("multipart must have Content-Length, no chunking")
+			}
+			if err := r.ParseMultipartForm(1024 * 1024); err != nil {
+				t.Error(err)
+				return
+			}
+			defer r.MultipartForm.RemoveAll()
+			for key, want := range map[string]string{"dwColor": "2", "dwPaperId": "8", "dwDuplex": "2", "dwCopies": "2", "dwFrom": "2", "dwTo": "3"} {
+				if r.FormValue(key) != want {
+					t.Errorf("%s=%s", key, r.FormValue(key))
+				}
+			}
+			if !strings.HasPrefix(r.FormValue("BackURL"), base+auth.CloudPrintJobsPage+"?t=") {
+				t.Error("wrong BackURL")
+			}
+			part, header, err := r.FormFile("szPath")
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			defer part.Close()
+			content, _ := io.ReadAll(part)
+			if strings.Contains(header.Header.Get("Content-Disposition"), "filename*=") {
+				t.Error("older print server requires browser-style UTF-8 filename=, not filename*=")
+			}
+			if header.Filename != info.Name() || string(content) != "%PDF-1.4\nfixture document\n" || header.Header.Get("Content-Type") != "application/pdf" {
+				t.Error("file part corrupted")
+			}
+			http.Redirect(w, r, auth.CloudPrintJobsPage+"?code=0&fee=40&message=", http.StatusSeeOther)
+		case auth.CloudPrintJobsPage:
+			fmt.Fprint(w, "print page")
+		default:
+			t.Errorf("unexpected request %s", r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+	base = srv.URL
+	c, _ := auth.NewCookieClient()
+	a := &cloudPrintTestAuth{client: c}
+	s := &CloudPrintService{auth: a, base: base}
+	result, err := s.Upload(f, info, CloudPrintOptions{Color: "color", Paper: "a3", Duplex: "long-edge", Copies: 2, Pages: "2-3"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if posts.Load() != 1 || result.FeeRaw != "40" || result.Verification != "matched_new_job" || len(result.Jobs) != 1 || result.Jobs[0]["dwJobId"] != float64(101) {
+		t.Fatalf("result=%+v, posts=%d", result, posts.Load())
+	}
+	if _, ok := result.Jobs[0]["szPaperDetail"].([]interface{}); !ok {
+		t.Fatal("paper detail string not decoded")
+	}
+	for _, key := range []string{"szTrueName", "szCardNO", "szFileName"} {
+		if _, exists := result.Jobs[0][key]; exists {
+			t.Errorf("private field %s leaked", key)
+		}
+	}
+}
+
+func TestCloudPrintUploadNeverReplaysAmbiguousOrRejectedPOST(t *testing.T) {
+	for _, mode := range []string{"connection-lost", "307", "missing-code", "auth-expired", "413"} {
+		t.Run(mode, func(t *testing.T) {
+			f, info := cloudPrintFixture(t)
+			var posts atomic.Int32
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/api/client/Auth/Check":
+					fmt.Fprint(w, `{"code":0,"SessionId":"session"}`)
+				case "/api/client/PrintJob/Get":
+					if posts.Load() > 0 {
+						json.NewEncoder(w).Encode(map[string]interface{}{"code": 0, "result": []map[string]interface{}{{"dwJobId": 7, "szJobName": info.Name()}}})
+					} else {
+						fmt.Fprint(w, `{"code":0,"result":[]}`)
+					}
+				case "/api/client/CloudPrint/Upload":
+					posts.Add(1)
+					io.Copy(io.Discard, r.Body)
+					switch mode {
+					case "connection-lost":
+						conn, _, err := w.(http.Hijacker).Hijack()
+						if err != nil {
+							t.Error(err)
+							return
+						}
+						conn.Close()
+					case "307":
+						w.Header().Set("Location", "/api/client/CloudPrint/Upload")
+						w.WriteHeader(307)
+					case "missing-code":
+						fmt.Fprint(w, "ok")
+					case "auth-expired":
+						http.Redirect(w, r, auth.CloudPrintJobsPage+"?code=4", 302)
+					case "413":
+						w.WriteHeader(413)
+					}
+				case auth.CloudPrintJobsPage:
+					fmt.Fprint(w, "print page")
+				}
+			}))
+			defer srv.Close()
+			c, _ := auth.NewCookieClient()
+			a := &cloudPrintTestAuth{client: c}
+			s := &CloudPrintService{auth: a, base: srv.URL}
+			_, err := s.Upload(f, info, CloudPrintOptions{Color: "bw", Paper: "a4", Duplex: "simplex", Copies: 1, Pages: "all"})
+			if err == nil || posts.Load() != 1 || a.invalidations != 0 {
+				t.Fatalf("err=%v posts=%d invalidations=%d", err, posts.Load(), a.invalidations)
+			}
+			var uncertain *CloudPrintUploadUncertainError
+			if mode == "connection-lost" || mode == "307" || mode == "missing-code" {
+				if !errors.As(err, &uncertain) {
+					t.Fatalf("want uncertain: %v", err)
+				}
+			}
+			if mode == "connection-lost" && !strings.Contains(err.Error(), "ID=7") {
+				t.Fatalf("missing reconciliation: %v", err)
+			}
+		})
+	}
+}

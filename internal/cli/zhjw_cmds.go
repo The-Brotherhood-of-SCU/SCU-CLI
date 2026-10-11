@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -24,6 +25,10 @@ func runJSON(fn func() (interface{}, error)) error {
 
 // errorKind 按错误类型给出机器可读分类。
 func errorKind(err error) string {
+	var uncertain *api.CloudPrintUploadUncertainError
+	if errors.As(err, &uncertain) {
+		return "upload_uncertain"
+	}
 	switch {
 	case auth.IsUnauthenticated(err):
 		return "unauthenticated"

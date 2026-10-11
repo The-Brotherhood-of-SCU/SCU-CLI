@@ -6,6 +6,13 @@
 
 ## [Unrelease]
 
+### 新增
+
+- 云打印默认设置为 A4、黑白、长边双面、全部页、1 份，仍可用命令参数覆盖。
+- 图书馆云打印：`scu cloudprint upload <file-path>`（或 `--file`）支持黑白/彩色、A4/A3/原纸型、单面/长边/短边、份数、连续页范围；`--dry-run` 离线验证文件与参数，`check` 验证会话，`jobs`/`list` 查询任务并解析纸张明细。
+- 云打印认证复用 SCU root cookie session，解析 SSoPage JSON 链接并通过 libic/CAS 回跳，以 Auth/Check 的 code 和 SessionId 确认登录；每一跳检查目标 origin。
+- 为非幂等上传增加不重试的流式传输，携带 Content-Length；提交后只跟随 GET 回跳，307/308 不重放文件，结果不确定时返回 `upload_uncertain`，成功后核对新增同名任务。
+
 ## [0.6.0] - 2026-09-24
 
 ### 新增
