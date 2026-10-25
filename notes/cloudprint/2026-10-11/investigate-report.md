@@ -65,7 +65,7 @@
 
 ## 证据与边界
 
-同目录 `scu-probe-*.json`：实际 XHR.send 字段、最终响应 URL、对应任务。`dom-js-mapping.json`：DOM、字典与重置复现。`preview-*.png`：自造文档预览；`color-preview-check.json`：像素检查；`cleanup.json`：清理结果。`public-source/`：公开源码及 SHA256。
+同目录 `scu-probe-*.json`：实际 XHR.send 字段、最终响应 URL、对应任务。`dom-js-mapping.json`：DOM、字典与重置复现。`preview-*.png`：自造文档预览；`color-preview-check.json`：像素检查；`cleanup.json`：清理结果。2026-10-25 根据 review 移除第三方网页源码副本；来源 URL 与调查版本 SHA256 保留在 `protocol.md`。
 
 原始 HTTP 重定向状态/Location 未保留；XHR 记录器观察 send 和最终 responseURL，不等于完整线上原始字节抓包。短边/长边的任务编码已验证，**纸张物理翻转效果未验证，需要线下刷卡打印**。服务为 HTTP，传输无 TLS。Go 测试未运行：无 Go 代码改动。
 

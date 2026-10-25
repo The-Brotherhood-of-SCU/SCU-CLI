@@ -9,4 +9,5 @@
 - 发现页面bug：设置页范围后change份数会重置1–1，原因在cprint.js通用change handler。先份数后范围的复测提交2–3成功。
 - 自有测试任务全部删除，用户任务保留。报告：`notes/cloudprint/2026-10-11/investigate-report.md`。用户要求推送报告；CLI SSO实测仍未执行。
 - CLI 代码未改，Go 测试未运行。
+- 后续更新（2026-10-25）：按 PR review 移除 `public-source/` 第三方网页源码副本；来源 URL 和调查版本 SHA256 保留在 `protocol.md`，原协议及脱敏验证材料保留。
 - 下次若实施：先验证 CLI SSO + Auth/Check，再加上传/列表最小命令，明确非幂等恢复；勿另存密码，勿把 token 送到 HTTP 打印 IP。

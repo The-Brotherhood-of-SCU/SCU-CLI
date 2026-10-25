@@ -325,7 +325,7 @@ scu cloudprint jobs            # list 为别名
 - `--dry-run` 只验证本地文件并返回 protocol fields，不要求登录。非空普通文件及格式后缀先做本地检查，格式转换由服务器负责；大文件可设置 `SCU_CLI_TIMEOUT=120`。
 - 使用 `scu login` 的已有凭据；不另存图书馆密码或输出 SessionId。上传只创建云打印任务，实际打印由用户在馆内刷卡确认。
 - 按用户已授权的文件与设置执行上传；已有明确授权时无需重复确认。
-- 上传 POST 永不自动重放。`upload_uncertain` 表示可能已成功，先用 `jobs` 核对；上传后的 `unauthenticated` 同样先核对列表，再决定是否重试。
+- 上传 POST 永不自动重放。文件提交后的 HTTP 401/403、回跳 `code=4` 等认证错误统一返回 `upload_uncertain`，表示可能已生成任务；先用 `jobs` 核对，不能仅重新登录后直接重传。文件提交前的认证失败仍为 `unauthenticated`，HTTP 413 明确拒绝文件仍为 `service`。
 - 成功输出 `status=uploaded`、`verification`、`jobs`；`matched_new_job` 为一个新增同名任务，`pending`/`ambiguous` 查看 `warning`。`jobs` 的 `szPaperDetail` 已解析；页数和纸张数为每份，`dwCopies` 另计。
 - `fee_raw` 单位未确认，不能解释成已扣费。打印接口使用 HTTP。
 

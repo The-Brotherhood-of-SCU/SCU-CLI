@@ -89,7 +89,7 @@ WSL 可使用 /mnt/c/... 或引号包裹的 C:\... 文件路径。`,
 			if path == "" {
 				return output.Fail("input", fmt.Errorf("请提供文件路径或 --file"))
 			}
-			fields, err := options.Fields()
+			settings, err := options.Prepare()
 			if err != nil {
 				return output.Fail("input", err)
 			}
@@ -104,14 +104,14 @@ WSL 可使用 /mnt/c/... 或引号包裹的 C:\... 文件路径。`,
 			defer f.Close()
 			if dryRun {
 				return output.JSON(map[string]interface{}{"dry_run": true, "file_path": path, "file_name": info.Name(), "file_size": info.Size(), "settings": options,
-					"endpoint": auth.CloudPrintBase + "/api/client/CloudPrint/Upload", "file_field": "szPath", "fields": fields, "back_url_page": auth.CloudPrintBase + auth.CloudPrintJobsPage})
+					"endpoint": auth.CloudPrintBase + "/api/client/CloudPrint/Upload", "file_field": "szPath", "fields": settings.Fields(), "back_url_page": auth.CloudPrintBase + auth.CloudPrintJobsPage})
 			}
 			return runJSON(func() (interface{}, error) {
 				s, err := newCloudPrintService()
 				if err != nil {
 					return nil, err
 				}
-				return s.Upload(f, info, options)
+				return s.Upload(f, info, settings)
 			})
 		},
 	}

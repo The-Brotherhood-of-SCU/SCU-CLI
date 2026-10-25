@@ -77,7 +77,7 @@ WebBridge `network` 在上传前已开启，但上传重定向后，同一 reque
 
 | ID | Owner | 状态 | 产物/证据 |
 |---|---|---|---|
-| CP-1 | agent | done | 入口、公开源码；`public-source/` |
+| CP-1 | agent | done | 入口、网页协议分析；来源 URL 与 SHA256 见下文 |
 | CP-2 | user + agent | done | 用户选文件，agent 点击上传；`observations.json` |
 | CP-3 | agent | done | 协议、认证边界；本文件 |
 | CP-4 | user | superseded | 扩展本地文件权限方案改为用户手动选文件 |
@@ -86,11 +86,23 @@ WebBridge `network` 在上传前已开启，但上传重定向后，同一 reque
 
 ## Sources
 
-公开源码保存在 `public-source/`，均于调查当天下载。
+公开网页曾于 2026-10-11 下载供协议分析。按 2026-10-25 PR review 建议，仓库不再分发第三方 HTML/JS 副本；仅保留来源 URL、当时的 SHA256、协议说明和脱敏探测记录。报告中的源码行号指当时下载版本，不保证线上页面以后保持相同。以下哈希用于核对原调查版本，不表示当前线上内容已经重验。
 
 - [上传页面](http://202.115.54.240/client/new/cprintPc/cprint.html)
 - [上传 JS](http://202.115.54.240/client/new/cprintPc/js/cprint.js)
 - [认证公共 JS](http://202.115.54.240/client/new/cprintPc/js/common.js)
 - [列表 JS](http://202.115.54.240/client/new/cprintPc/js/printDoc.js)
+- [列表页面](http://202.115.54.240/client/new/cprintPc/printDoc.html)
+- [接口地址配置 JS](http://202.115.54.240/client/new/cprintPc/js/host.js)
 - [配置 JS](http://202.115.54.240/client/new/setconfig.js)
 - [帮助页](http://202.115.54.240/client/new/cprintPc/help.html)
+
+| 原文件 | SHA256（2026-10-11） |
+|---|---|
+| common.js | `d84af89803d134308b3ded9efb471ca641c5ac3e76bbfbdebef3037b0859ea47` |
+| cprint.html | `baf476f393b048d2238e1fb41e1d570b6387407a75724dd38e55772f96c8b341` |
+| cprint.js | `dcd924151678378819134ec6bca581c80230462336d6555b13702a2ae09c3404` |
+| host.js | `7eb630ee19e691d74b5b63d2ac30a3cdb48b54dafba1922e2394d98d0cf27f5a` |
+| printDoc.html | `8ca7e72c9d369c86825eb4b15f116a879cc8ee327cabe6295730779845994cc0` |
+| printDoc.js | `66c3179c9be988a106e34a4552b185f5740d57305d7e98a1cec37bd963055369` |
+| setconfig.js | `1591ea20f54b3fc72ba42e0eea5ba5ec36c39f52ffda28a77c40175faba5c7dc` |

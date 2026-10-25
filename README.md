@@ -157,7 +157,7 @@ scu cloudprint jobs
 
 支持网页允许的 PDF、图片、TXT、Office 等文件后缀；具体格式能否转换由打印服务器决定。`jobs`/`list` 返回打印所需的后端任务字段，省略账号、姓名、卡号和服务器文件路径；`szPaperDetail` JSON 字符串自动解析为数组。上传输出 `status=uploaded`、`verification` 和新增同名任务 `jobs`；`matched_new_job` 表示发现一个新增同名任务，`pending`/`ambiguous` 时按 `warning` 核对，避免重复上传。`fee_raw` 原样保留服务器回跳参数，其单位未确认。
 
-上传生成待打印任务，实际打印在馆内终端刷校园卡确认。服务为 HTTP。文件采用流式 multipart 和 Content-Length；上传 POST 不自动重放，超时、异常回跳或缺失结果码返回 `upload_uncertain`，先运行 `scu cloudprint jobs` 判断是否已生成任务。大文件可设置 `SCU_CLI_TIMEOUT=120` 等延长单次请求超时。
+上传生成待打印任务，实际打印在馆内终端刷校园卡确认。服务为 HTTP。文件采用流式 multipart 和 Content-Length；上传 POST 不自动重放。文件提交后的超时、异常回跳、缺失结果码，以及 HTTP 401/403 或回跳 `code=4`，均返回 `upload_uncertain`；先运行 `scu cloudprint jobs` 核对，不能仅重新登录后直接重传。文件提交前的认证失败仍返回 `unauthenticated`，HTTP 413 明确拒绝文件仍返回 `service`。大文件可设置 `SCU_CLI_TIMEOUT=120` 等延长单次请求超时。
 
 ## 许可证
 

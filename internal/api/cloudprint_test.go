@@ -39,6 +39,15 @@ func cloudPrintFixture(t *testing.T) (*os.File, os.FileInfo) {
 	return f, info
 }
 
+func prepareCloudPrintSettings(t *testing.T, options CloudPrintOptions) *CloudPrintSettings {
+	t.Helper()
+	settings, err := options.Prepare()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return settings
+}
+
 func TestCloudPrintOptionsMatchInvestigatedProtocol(t *testing.T) {
 	for _, tc := range []struct {
 		color, paper, duplex, pages string
@@ -49,10 +58,11 @@ func TestCloudPrintOptionsMatchInvestigatedProtocol(t *testing.T) {
 		{"color", "a3", "long-edge", "2-3", 2, map[string]string{"dwColor": "2", "dwPaperId": "8", "dwDuplex": "2", "dwCopies": "2", "dwFrom": "2", "dwTo": "3"}},
 		{"bw", "original", "short-edge", "4", 1, map[string]string{"dwColor": "1", "dwPaperId": "-1", "dwDuplex": "3", "dwCopies": "1", "dwFrom": "4", "dwTo": "4"}},
 	} {
-		got, err := (CloudPrintOptions{Color: tc.color, Paper: tc.paper, Duplex: tc.duplex, Pages: tc.pages, Copies: tc.copies}).Fields()
+		settings, err := (CloudPrintOptions{Color: tc.color, Paper: tc.paper, Duplex: tc.duplex, Pages: tc.pages, Copies: tc.copies}).Prepare()
 		if err != nil {
 			t.Fatal(err)
 		}
+		got := settings.Fields()
 		for key, want := range tc.want {
 			if got[key] != want {
 				t.Errorf("%s=%s, want %s", key, got[key], want)
@@ -60,7 +70,7 @@ func TestCloudPrintOptionsMatchInvestigatedProtocol(t *testing.T) {
 		}
 	}
 	for _, pages := range []string{"0", "3-2", "1,3", "-1", "", "1-2-3", "1-", "4294967296"} {
-		if _, err := (CloudPrintOptions{Color: "bw", Paper: "a4", Duplex: "simplex", Copies: 1, Pages: pages}).Fields(); err == nil {
+		if _, err := (CloudPrintOptions{Color: "bw", Paper: "a4", Duplex: "simplex", Copies: 1, Pages: pages}).Prepare(); err == nil {
 			t.Errorf("accepted invalid range %q", pages)
 		}
 	}
@@ -126,7 +136,11 @@ func TestCloudPrintUploadStreamsCorrectFormAndMatchesNewJob(t *testing.T) {
 	c, _ := auth.NewCookieClient()
 	a := &cloudPrintTestAuth{client: c}
 	s := &CloudPrintService{auth: a, base: base}
-	result, err := s.Upload(f, info, CloudPrintOptions{Color: "color", Paper: "a3", Duplex: "long-edge", Copies: 2, Pages: "2-3"})
+	settings := prepareCloudPrintSettings(t, CloudPrintOptions{Color: "color", Paper: "a3", Duplex: "long-edge", Copies: 2, Pages: "2-3"})
+	// dry-run 等调用方拿到的是副本，不能改坏随后实际上传的已校验字段。
+	fields := settings.Fields()
+	fields["dwCopies"] = "99"
+	result, err := s.Upload(f, info, settings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +158,7 @@ func TestCloudPrintUploadStreamsCorrectFormAndMatchesNewJob(t *testing.T) {
 }
 
 func TestCloudPrintUploadNeverReplaysAmbiguousOrRejectedPOST(t *testing.T) {
-	for _, mode := range []string{"connection-lost", "307", "missing-code", "auth-expired", "413"} {
+	for _, mode := range []string{"connection-lost", "307", "missing-code", "auth-expired", "401", "403", "callback-401", "callback-403", "413"} {
 		t.Run(mode, func(t *testing.T) {
 			f, info := cloudPrintFixture(t)
 			var posts atomic.Int32
@@ -176,30 +190,61 @@ func TestCloudPrintUploadNeverReplaysAmbiguousOrRejectedPOST(t *testing.T) {
 						fmt.Fprint(w, "ok")
 					case "auth-expired":
 						http.Redirect(w, r, auth.CloudPrintJobsPage+"?code=4", 302)
+					case "401":
+						w.WriteHeader(401)
+					case "403":
+						w.WriteHeader(403)
+					case "callback-401", "callback-403":
+						http.Redirect(w, r, auth.CloudPrintJobsPage+"?code=0", 302)
 					case "413":
 						w.WriteHeader(413)
 					}
 				case auth.CloudPrintJobsPage:
-					fmt.Fprint(w, "print page")
+					switch mode {
+					case "callback-401":
+						w.WriteHeader(401)
+					case "callback-403":
+						w.WriteHeader(403)
+					default:
+						fmt.Fprint(w, "print page")
+					}
 				}
 			}))
 			defer srv.Close()
 			c, _ := auth.NewCookieClient()
 			a := &cloudPrintTestAuth{client: c}
 			s := &CloudPrintService{auth: a, base: srv.URL}
-			_, err := s.Upload(f, info, CloudPrintOptions{Color: "bw", Paper: "a4", Duplex: "simplex", Copies: 1, Pages: "all"})
+			_, err := s.Upload(f, info, prepareCloudPrintSettings(t, CloudPrintOptions{Color: "bw", Paper: "a4", Duplex: "simplex", Copies: 1, Pages: "all"}))
 			if err == nil || posts.Load() != 1 || a.invalidations != 0 {
 				t.Fatalf("err=%v posts=%d invalidations=%d", err, posts.Load(), a.invalidations)
 			}
 			var uncertain *CloudPrintUploadUncertainError
-			if mode == "connection-lost" || mode == "307" || mode == "missing-code" {
+			if mode != "413" {
 				if !errors.As(err, &uncertain) {
 					t.Fatalf("want uncertain: %v", err)
+				}
+				if auth.IsUnauthenticated(err) {
+					t.Fatalf("提交后不能引导按 unauthenticated 重试: %v", err)
+				}
+			} else {
+				var rejected *auth.ServiceError
+				if !errors.As(err, &rejected) || errors.As(err, &uncertain) {
+					t.Fatalf("413 明确拒绝应返回 service: %v", err)
 				}
 			}
 			if mode == "connection-lost" && !strings.Contains(err.Error(), "ID=7") {
 				t.Fatalf("missing reconciliation: %v", err)
 			}
 		})
+	}
+}
+
+func TestCloudPrintUploadRejectsUnpreparedSettingsBeforeAuth(t *testing.T) {
+	f, info := cloudPrintFixture(t)
+	s := &CloudPrintService{}
+	for _, settings := range []*CloudPrintSettings{nil, {}} {
+		if _, err := s.Upload(f, info, settings); err == nil {
+			t.Fatal("未校验设置不应触发认证或上传")
+		}
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"mime"
 	"mime/multipart"
 	"net/textproto"
@@ -26,8 +27,24 @@ type CloudPrintOptions struct {
 	Pages  string `json:"pages"`
 }
 
-// Fields validates user options and translates only the observed protocol values.
-func (o CloudPrintOptions) Fields() (map[string]string, error) {
+// CloudPrintSettings 保存已校验的设置与协议字段，供 dry-run 和上传共用。
+// 字段不对外开放，避免提交时绕过校验或混入未知协议参数。
+type CloudPrintSettings struct {
+	options CloudPrintOptions
+	fields  map[string]string
+}
+
+// Fields 返回协议字段副本；添加 BackURL 不会修改已校验设置。
+func (s *CloudPrintSettings) Fields() map[string]string {
+	fields := make(map[string]string, len(s.fields))
+	for key, value := range s.fields {
+		fields[key] = value
+	}
+	return fields
+}
+
+// Prepare 校验用户设置，并转换为调查确认的协议值，仅需在入口调用一次。
+func (o CloudPrintOptions) Prepare() (*CloudPrintSettings, error) {
 	color := map[string]string{"bw": "1", "color": "2"}[strings.ToLower(o.Color)]
 	paper := map[string]string{"a4": "9", "a3": "8", "original": "-1"}[strings.ToLower(o.Paper)]
 	duplex := map[string]string{"simplex": "1", "long-edge": "2", "short-edge": "3"}[o.Duplex]
@@ -40,7 +57,7 @@ func (o CloudPrintOptions) Fields() (map[string]string, error) {
 	if duplex == "" {
 		return nil, fmt.Errorf("--duplex 必须为 simplex、long-edge 或 short-edge")
 	}
-	if o.Copies < 1 || uint64(o.Copies) > uint64(^uint32(0)) {
+	if o.Copies < 1 || uint64(o.Copies) > math.MaxUint32 {
 		return nil, fmt.Errorf("--copies 必须为正整数（不超过 uint32 范围）")
 	}
 	from, to := "0", "0"
@@ -62,14 +79,14 @@ func (o CloudPrintOptions) Fields() (map[string]string, error) {
 		}
 		from, to = strconv.FormatUint(first, 10), strconv.FormatUint(last, 10)
 	}
-	return map[string]string{"dwColor": color, "dwPaperId": paper, "dwDuplex": duplex,
-		"dwCopies": strconv.Itoa(o.Copies), "dwFrom": from, "dwTo": to}, nil
+	return &CloudPrintSettings{options: o, fields: map[string]string{"dwColor": color, "dwPaperId": paper, "dwDuplex": duplex,
+		"dwCopies": strconv.Itoa(o.Copies), "dwFrom": from, "dwTo": to}}, nil
 }
 
 var cloudPrintExtensions = strings.Fields("jpg jpeg heic png pdf txt doc xls docx xlsx ppt pptx wps wpt dot rtf dotx docm dotm xml mht mhtml html htm xps odt xlsm xlsb csv xltx xltm xlt prn dif slk xla xlam ods dps dpt pot pps pptm potm ppsm")
 
-// OpenCloudPrintFile verifies a readable, nonempty regular file before any SSO
-// or write request. The returned open file is also used for upload (no reopen).
+// OpenCloudPrintFile 在认证或提交前检查文件可读、非空且为普通文件。
+// 上传复用已打开的文件，不再根据路径重新打开。
 func OpenCloudPrintFile(path string) (*os.File, os.FileInfo, error) {
 	if strings.ContainsAny(filepath.Base(path), "\r\n") {
 		return nil, nil, fmt.Errorf("文件名不能含换行符")
@@ -137,8 +154,7 @@ func (s *CloudPrintService) Jobs() ([]map[string]interface{}, error) {
 			}
 		}
 		for i, rawJob := range jobs {
-			// Keep task metadata; account/card/name fields and server file paths
-			// are unnecessary for printing and should not enter agent logs.
+			// 只保留任务元数据；账号、卡号、姓名及服务器路径不进入 agent 日志。
 			job := make(map[string]interface{})
 			for _, key := range []string{"dwJobId", "dwOldJobId", "dwCreateDate", "dwCreateTime", "dwPrintDate", "dwPrintTime", "dwPages", "dwCopies", "dwStatus", "dwFee", "szAttribe", "szPaperDetail", "szJobName"} {
 				if value, exists := rawJob[key]; exists {
@@ -168,15 +184,15 @@ type CloudPrintUploadResult struct {
 	Warning      string                   `json:"warning,omitempty"`
 }
 
-// CloudPrintUploadUncertainError must never trigger automatic upload replay.
+// CloudPrintUploadUncertainError 表示文件可能已被接收，禁止自动重新上传。
 type CloudPrintUploadUncertainError struct{ Reason string }
 
 func (e *CloudPrintUploadUncertainError) Error() string {
 	return e.Reason + "；上传未自动重发，请用 scu cloudprint jobs 核对任务后再决定是否重新上传"
 }
 
-// multipartFile streams the opened file, preserving Content-Length for this
-// older server, without buffering the file or creating a replayable request.
+// multipartFile 流式读取文件并明确 Content-Length，兼容旧服务器；
+// 只缓冲 multipart 头尾，不缓存文件内容，也不创建可重放的请求体。
 func multipartFile(f *os.File, info os.FileInfo, fields map[string]string) (io.Reader, string, int64, error) {
 	var buf bytes.Buffer
 	w := multipart.NewWriter(&buf)
@@ -186,8 +202,8 @@ func multipartFile(f *os.File, info os.FileInfo, fields map[string]string) (io.R
 		}
 	}
 	h := make(textproto.MIMEHeader)
-	// Match browser FormData: this older server does not understand RFC 5987's
-	// filename*= form for non-ASCII names. Keep UTF-8 in the quoted filename.
+	// 与浏览器 FormData 一致：旧服务器不接受中文 filename*=，
+	// 需在带引号的 filename= 中保留 UTF-8 文件名。
 	escape := strings.NewReplacer("\\", "\\\\", "\"", "\\\"")
 	h.Set("Content-Disposition", fmt.Sprintf("form-data; name=\"szPath\"; filename=\"%s\"", escape.Replace(info.Name())))
 	contentType := mime.TypeByExtension(strings.ToLower(filepath.Ext(info.Name())))
@@ -229,7 +245,7 @@ func (s *CloudPrintService) uploadResult(c *auth.CookieClient, resp *auth.Respon
 		case 413:
 			return "", &auth.ServiceError{Msg: "云打印服务器拒绝文件（HTTP 413，文件过大）"}
 		case 401, 403:
-			return "", &auth.UnauthenticatedError{Msg: "云打印上传认证被拒绝；未自动重发，请重新登录并先核对任务列表"}
+			return "", &CloudPrintUploadUncertainError{Reason: fmt.Sprintf("文件提交后的认证被拒绝（HTTP %d），是否已生成任务未知", resp.StatusCode)}
 		}
 		if resp.StatusCode != 200 || resp.URL == nil {
 			return "", &CloudPrintUploadUncertainError{Reason: fmt.Sprintf("上传响应异常（HTTP %d）", resp.StatusCode)}
@@ -244,7 +260,7 @@ func (s *CloudPrintService) uploadResult(c *auth.CookieClient, resp *auth.Respon
 		}
 		if code != 0 {
 			if code == 4 {
-				return "", &auth.UnauthenticatedError{Msg: "云打印上传会话失效；未自动重发，请先核对任务列表"}
+				return "", &CloudPrintUploadUncertainError{Reason: "文件提交后的云打印会话已失效（code=4），是否已生成任务未知"}
 			}
 			return "", &auth.ServiceError{Msg: fmt.Sprintf("云打印上传失败（code=%d）: %s", code, resp.URL.Query().Get("message"))}
 		}
@@ -268,13 +284,13 @@ func newCloudPrintJobs(before, after []map[string]interface{}, name string) []ma
 	return added
 }
 
-// Upload retries only authentication/read operations BEFORE submission. Once
-// DoOnce is called the multipart POST is never replayed, including auth failure.
-func (s *CloudPrintService) Upload(f *os.File, info os.FileInfo, options CloudPrintOptions) (*CloudPrintUploadResult, error) {
-	fields, err := options.Fields()
-	if err != nil {
-		return nil, err
+// Upload 复用入口处已校验的设置，只在文件提交前恢复认证或重试读取。
+// 调用 DoOnce 后即使认证失效也不重放文件，统一按上传结果不确定处理。
+func (s *CloudPrintService) Upload(f *os.File, info os.FileInfo, settings *CloudPrintSettings) (*CloudPrintUploadResult, error) {
+	if settings == nil || len(settings.fields) == 0 {
+		return nil, fmt.Errorf("上传前需先调用 CloudPrintOptions.Prepare 校验打印设置")
 	}
+	fields, options := settings.Fields(), settings.options
 	if err := s.Check(); err != nil {
 		return nil, err
 	}
@@ -295,8 +311,8 @@ func (s *CloudPrintService) Upload(f *os.File, info os.FileInfo, options CloudPr
 		"Content-Type": contentType, "Origin": s.base, "Referer": s.base + auth.CloudPrintPage,
 	}, body, size)
 	if err != nil {
-		// Reading the list is safe; an observed task remains a candidate because
-		// another client could concurrently upload a file with the same name.
+		// 失败后可以安全查询列表；其他客户端可能并发上传同名文件，
+		// 因此观察到的新增任务只能作为待核对候选。
 		reason := "文件上传请求失败，服务器是否已接收未知"
 		if after, listErr := s.Jobs(); listErr == nil {
 			if added := newCloudPrintJobs(before, after, info.Name()); len(added) > 0 {

@@ -20,7 +20,7 @@ go vet ./...                # 无 lint 配置，vet 即可
 ## 输出契约（所有命令必须遵守）
 
 - stdout 恒为单个 JSON 包层：`{"ok":true,"data":...}` 或 `{"ok":false,"error":{"kind","message"}}`，由 `internal/output` 统一写入；诊断/提示一律走 stderr（`output.Info`）。
-- 失败时返回非零退出码。新命令用 `runJSON` 包裹（`internal/cli/zhjw_cmds.go`），它按错误类型映射 `error.kind`；`auth.IsUnauthenticated` → `unauthenticated`，其余 → `service`。
+- 失败时返回非零退出码。新命令用 `runJSON` 包裹（`internal/cli/zhjw_cmds.go`），公共分类器在 `internal/cli/errors.go`：上传结果不确定优先映射 `upload_uncertain`，然后区分 `unauthenticated`、`config` 与 `service`。
 - 编号类参数（planCode、楼栋 code 等）不靠猜，由"发现链"命令逐级输出；新命令的 `--help` 需标明参数来源命令。
 
 ## 架构：分层与认证模型
@@ -45,6 +45,7 @@ cmd/scu → internal/cli（cobra 命令，每命令组一个文件）
 - `internal/config`：除凭据外还存电费余额趋势快照（`balance_history.json`，按房间归集保留 365 天）。配置目录可被 `SCU_CLI_CONFIG_DIR` 覆盖——**测试必须用 `t.Setenv("SCU_CLI_CONFIG_DIR", t.TempDir())` 隔离**，避免碰真实凭据。
 - `internal/ics`：ICS 日历导出，校区节次时段表自动探测（`campus.go`）。
 - `internal/api/cloudprint.go` / `internal/cli/cloudprint_cmds.go`：`cloudprint upload <file-path>`（或 `--file`）、`check`、`jobs`/`list`、离线 `--dry-run`。默认 **A4、黑白、长边双面、全部页、1 份**；短边/长边映射分别为 3/2。
-- **云打印文件 POST 不得自动重放**：使用流式 `CookieClient.DoOnce` 和已知 Content-Length，不能改为普通 `Do` 或将整个上传包在 `RetryOnUnauthenticated` 中。认证/读请求可在提交前恢复；提交后的连接异常、307/308 或缺失结果码返回 `upload_uncertain`，先核对任务。仅对 301/302/303 跟随受限同源 GET。
+- **云打印文件 POST 不得自动重放**：使用流式 `CookieClient.DoOnce` 和已知 Content-Length，不能改为普通 `Do` 或将整个上传包在 `RetryOnUnauthenticated` 中。认证/读请求可在提交前恢复；提交后的连接异常、307/308、缺失结果码、HTTP 401/403 或回跳 code=4 均返回 `upload_uncertain`，先核对任务，不能返回引导重传的 `unauthenticated`。仅对 301/302/303 跟随受限同源 GET；HTTP 413 明确拒绝仍为 `service`。
+- 云打印选项只在入口处调用 `CloudPrintOptions.Prepare` 校验一次；`CloudPrintSettings` 保存已校验设置，dry-run 读取字段副本，上传复用同一份设置。
 - 云打印中文文件名按浏览器 FormData 使用带引号 UTF-8 `filename=`；真实服务器拒绝 RFC 5987 `filename*=`。任务输出过滤姓名、账号、卡号、服务器文件路径，`szPaperDetail` 二次 JSON 解析；`fee_raw` 单位未确认，上传不代表实际打印或付款。PDF CLI 实测记录见 `notes/cloudprint/2026-10-11/cli-verification.md`。
 - npm 分发：`install.js`（postinstall）按平台从 GitHub Release 下载二进制（SHA256 校验）并安装 Skill 到 `~/.claude/skills/scu-cli/`（`SCU_CLI_NO_SKILL=1` 跳过）；`bin/scu.js` 是转发 shim。**package.json 的 version 必须对应已存在的 Release 标签**（CI 发布时用标签值覆盖）。
