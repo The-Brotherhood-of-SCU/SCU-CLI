@@ -326,7 +326,7 @@ scu cloudprint jobs            # list 为别名
 - 使用 `scu login` 的已有凭据；不另存图书馆密码或输出 SessionId。上传只创建云打印任务，实际打印由用户在馆内刷卡确认。
 - 按用户已授权的文件与设置执行上传；已有明确授权时无需重复确认。
 - 上传 POST 永不自动重放。文件提交后的 HTTP 401/403、回跳 `code=4` 等认证错误统一返回 `upload_uncertain`，表示可能已生成任务；先用 `jobs` 核对，不能仅重新登录后直接重传。文件提交前的认证失败仍为 `unauthenticated`，HTTP 413 明确拒绝文件仍为 `service`。
-- 成功输出 `status=uploaded`、`verification`、`jobs`。核对先按任务 ID 找新增项，再用服务器返回的份数和显式页范围排除冲突；`matched_new_job` 为一个新增同名任务。`candidate_new_job` 表示发现一个名称不同的新增候选（如服务端截断长文件名），必须按任务 ID 人工核对，不能当成确定匹配；`pending`/`ambiguous` 同样查看 `warning`。**上述状态都不表示上传失败，不能据此自动重新上传**。`jobs` 的 `szPaperDetail` 已解析；页数和纸张数为每份，`dwCopies` 另计。
+- 成功输出 `status=uploaded`、`verification`、`jobs`。核对先按整数任务 ID 找新增项，多轮候选取并集，只用已返回的份数和总页数排除明确冲突。**当前实测未回传 dwFrom/dwTo；显式范围仅用 dwPages 作弱核对，页数相同不能证明起止页相同，缺失字段也不能证明设置相符。** `matched_new_job` 为一个新增同名任务。`candidate_new_job` 表示发现一个名称不同的新增候选（如服务端截断长文件名），必须按任务 ID 人工核对，不能当成确定匹配；`pending`/`ambiguous` 同样查看 `warning`。**上述状态都不表示上传失败，不能据此自动重新上传**。`jobs` 的 `szPaperDetail` 已解析；页数和纸张数为每份，`dwCopies` 另计。
 - `fee_raw` 单位未确认，不能解释成已扣费。打印接口使用 HTTP。
 
 ## 14. 行为准则

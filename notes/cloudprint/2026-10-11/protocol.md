@@ -45,6 +45,7 @@ WebBridge `network` 在上传前已开启，但上传重定向后，同一 reque
 
 - `GET /api/client/PrintJob/Get`：JSON 包层 `code/message/result`，本次实测。
 - 关键任务字段：`dwJobId`、`dwOldJobId`、`dwStatus`、`dwPages`、`dwCopies`、`szAttribe`、`szPaperDetail`；最后一个字段是 JSON **字符串**，需二次解析。
+- 当前实测任务没有回传 `dwFrom/dwTo`。显式页范围只能以 `dwPages` 与请求页数作弱核对；页数相同不能证明起止页相同。字段缺失只能保留候选，不能当作设置相符的证据。预览图和自造 PDF 归档于 [docs/cloudprint/fixtures](../../../docs/cloudprint/fixtures/README.md)。
 - `GET /api/client/PrintJob/PreviewPage?dwJobId=...&dwCreateTime=...&pageNo=...`：源码显示 `result` 是 PNG base64。第一轮未请求用户文件预览；第二轮仅预览自造文档，确认范围与颜色，见补测报告。
 - `POST /api/client/PrintJob/Del`：源码显示 JSON `{dwJobId,dwOldJobId}`。第一轮未调用；第二轮仅删除5个自有测试任务，用户任务保留，见 `cleanup.json`。
 - 帮助页说明：上传生成待打印任务；实际打印需到馆内终端刷校园卡确认。上传不等于执行打印。

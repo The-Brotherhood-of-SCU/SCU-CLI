@@ -8,7 +8,7 @@
       1487,
       2105
     ],
-    "path": "preview-range-page-1.png"
+    "path": "../../../docs/cloudprint/fixtures/preview-range-page-1.png"
   },
   {
     "pageNo": 2,
@@ -19,6 +19,6 @@
       1487,
       2105
     ],
-    "path": "preview-range-page-2.png"
+    "path": "../../../docs/cloudprint/fixtures/preview-range-page-2.png"
   }
 ]
