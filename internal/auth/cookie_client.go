@@ -156,8 +156,8 @@ func (c *CookieClient) doOnce(method, rawURL string, headers map[string]string, 
 	}, nil
 }
 
-// DoOnce streams a request with a known Content-Length and never replays it.
-// Use for non-idempotent uploads: a transport failure may occur after acceptance.
+// DoOnce 以已知 Content-Length 流式发送一次请求，绝不自动重放。
+// 用于非幂等上传：传输失败时，服务器可能已经接收文件。
 func (c *CookieClient) DoOnce(method, rawURL string, headers map[string]string, body io.Reader, contentLength int64) (*Response, error) {
 	c.mu.Lock()
 	transport := c.rc.GetClient().Transport
@@ -171,7 +171,7 @@ func (c *CookieClient) DoOnce(method, rawURL string, headers map[string]string, 
 		return nil, err
 	}
 	req.ContentLength = contentLength
-	// Disable net/http's optional body replay as well as the Resty recovery path.
+	// 同时禁用 net/http 的可选请求体重放和 Resty 的故障恢复路径。
 	req.GetBody = nil
 	req.Header.Set("User-Agent", DefaultUserAgent)
 	for k, v := range headers {
@@ -210,8 +210,8 @@ func (c *CookieClient) FollowRedirects(rawURL string, headers map[string]string)
 	return c.followRedirects(rawURL, headers, nil)
 }
 
-// FollowRedirectsAllowed validates the initial URL and every redirect before
-// sending a request. Rejected URLs are deliberately omitted from error messages.
+// FollowRedirectsAllowed 在发送前校验初始 URL 和每一跳重定向。
+// 拒绝目标时不把 URL 放入错误信息，避免泄露登录票据。
 func (c *CookieClient) FollowRedirectsAllowed(rawURL string, headers map[string]string, allowed func(*url.URL) bool) (*Response, error) {
 	return c.followRedirects(rawURL, headers, allowed)
 }

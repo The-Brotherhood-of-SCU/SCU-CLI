@@ -21,7 +21,7 @@ func newCloudPrintService() (*api.CloudPrintService, error) {
 	return api.NewCloudPrintService(auth.NewCloudPrintAuth(a)), nil
 }
 
-// resolveCloudPrintPath accepts ~/ paths and, inside WSL, Windows drive paths.
+// resolveCloudPrintPath 支持 ~/ 路径，并在 WSL 中转换 Windows 盘符路径。
 func resolveCloudPrintPath(path string) (string, error) {
 	if strings.HasPrefix(path, "~/") {
 		home, err := os.UserHomeDir()

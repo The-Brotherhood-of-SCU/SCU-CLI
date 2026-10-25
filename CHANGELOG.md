@@ -8,11 +8,13 @@
 
 ### 修复
 
+- 云打印任务核对按 ID 找新增项，并排除返回设置不符的任务；长文件名被截断或改写时返回候选任务和 ID，明确保留已上传状态，避免因核对未完成而重复上传。统一云打印认证和单次传输相关中文注释。
 - 云打印文件提交后的 HTTP 401/403 和回跳 `code=4` 统一返回 `upload_uncertain`，避免调用方误按 `unauthenticated` 重新上传；补充实际响应类型及公共 JSON 错误分类测试，明确区分提交前认证失败和 HTTP 413 拒绝。
 - 公共错误分类器移至 `internal/cli/errors.go`；云打印设置仅校验一次，dry-run 与上传共用已校验设置。移除调查中的第三方网页源码副本，保留协议、来源 URL、SHA256 与脱敏实测记录。
 
 ### 新增
 
+- PR 与 main 分支推送自动运行 `go vet ./...`、`go test ./...`，Go 版本跟随 `go.mod`。
 - 云打印默认设置为 A4、黑白、长边双面、全部页、1 份，仍可用命令参数覆盖。
 - 图书馆云打印：`scu cloudprint upload <file-path>`（或 `--file`）支持黑白/彩色、A4/A3/原纸型、单面/长边/短边、份数、连续页范围；`--dry-run` 离线验证文件与参数，`check` 验证会话，`jobs`/`list` 查询任务并解析纸张明细。
 - 云打印认证复用 SCU root cookie session，解析 SSoPage JSON 链接并通过 libic/CAS 回跳，以 Auth/Check 的 code 和 SessionId 确认登录；每一跳检查目标 origin。

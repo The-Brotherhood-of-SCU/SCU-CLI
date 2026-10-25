@@ -156,7 +156,7 @@ func (s *CloudPrintService) Jobs() ([]map[string]interface{}, error) {
 		for i, rawJob := range jobs {
 			// 只保留任务元数据；账号、卡号、姓名及服务器路径不进入 agent 日志。
 			job := make(map[string]interface{})
-			for _, key := range []string{"dwJobId", "dwOldJobId", "dwCreateDate", "dwCreateTime", "dwPrintDate", "dwPrintTime", "dwPages", "dwCopies", "dwStatus", "dwFee", "szAttribe", "szPaperDetail", "szJobName"} {
+			for _, key := range []string{"dwJobId", "dwOldJobId", "dwCreateDate", "dwCreateTime", "dwPrintDate", "dwPrintTime", "dwPages", "dwCopies", "dwFrom", "dwTo", "dwStatus", "dwFee", "szAttribe", "szPaperDetail", "szJobName"} {
 				if value, exists := rawJob[key]; exists {
 					job[key] = value
 				}
@@ -269,7 +269,9 @@ func (s *CloudPrintService) uploadResult(c *auth.CookieClient, resp *auth.Respon
 	return "", &CloudPrintUploadUncertainError{Reason: "上传回跳次数超过限制"}
 }
 
-func newCloudPrintJobs(before, after []map[string]interface{}, name string) []map[string]interface{} {
+// newCloudPrintJobs 只按任务 ID 做前后差集，避免长文件名被服务端截断后漏掉任务。
+// 差集只说明有新增任务，不能据此断言它来自本次上传。
+func newCloudPrintJobs(before, after []map[string]interface{}) []map[string]interface{} {
 	known := make(map[string]bool)
 	for _, job := range before {
 		known[fmt.Sprint(job["dwJobId"])] = true
@@ -277,11 +279,34 @@ func newCloudPrintJobs(before, after []map[string]interface{}, name string) []ma
 	added := make([]map[string]interface{}, 0)
 	for _, job := range after {
 		id, exists := job["dwJobId"]
-		if exists && !known[fmt.Sprint(id)] && job["szJobName"] == name {
+		if exists && id != nil && !known[fmt.Sprint(id)] {
 			added = append(added, job)
+			known[fmt.Sprint(id)] = true
 		}
 	}
 	return added
+}
+
+// compatibleCloudPrintJobs 用服务器实际返回的设置排除冲突项；缺失字段不作为相符证据。
+// 全部页可能被服务器展开为具体范围，因此仅对显式页范围比较 dwFrom/dwTo。
+func compatibleCloudPrintJobs(jobs []map[string]interface{}, fields map[string]string) []map[string]interface{} {
+	compatible := make([]map[string]interface{}, 0)
+	for _, job := range jobs {
+		matches := true
+		for _, key := range []string{"dwCopies", "dwFrom", "dwTo"} {
+			if key != "dwCopies" && fields["dwFrom"] == "0" {
+				continue
+			}
+			if value, exists := job[key]; exists && fmt.Sprint(value) != fields[key] {
+				matches = false
+				break
+			}
+		}
+		if matches {
+			compatible = append(compatible, job)
+		}
+	}
+	return compatible
 }
 
 // Upload 复用入口处已校验的设置，只在文件提交前恢复认证或重试读取。
@@ -311,16 +336,16 @@ func (s *CloudPrintService) Upload(f *os.File, info os.FileInfo, settings *Cloud
 		"Content-Type": contentType, "Origin": s.base, "Referer": s.base + auth.CloudPrintPage,
 	}, body, size)
 	if err != nil {
-		// 失败后可以安全查询列表；其他客户端可能并发上传同名文件，
+		// 失败后可以安全查询列表；其他客户端可能并发上传文件，
 		// 因此观察到的新增任务只能作为待核对候选。
 		reason := "文件上传请求失败，服务器是否已接收未知"
 		if after, listErr := s.Jobs(); listErr == nil {
-			if added := newCloudPrintJobs(before, after, info.Name()); len(added) > 0 {
+			if added := compatibleCloudPrintJobs(newCloudPrintJobs(before, after), fields); len(added) > 0 {
 				ids := make([]string, 0, len(added))
 				for _, job := range added {
 					ids = append(ids, fmt.Sprint(job["dwJobId"]))
 				}
-				reason += "，已观察到新增同名任务 ID=" + strings.Join(ids, ",")
+				reason += "，已观察到新增候选任务 ID=" + strings.Join(ids, ",")
 			}
 		}
 		return nil, &CloudPrintUploadUncertainError{Reason: reason}
@@ -331,6 +356,7 @@ func (s *CloudPrintService) Upload(f *os.File, info os.FileInfo, settings *Cloud
 	}
 	result := &CloudPrintUploadResult{Status: "uploaded", FileName: info.Name(), Settings: options, FeeRaw: fee,
 		Jobs: make([]map[string]interface{}, 0), Verification: "pending", Message: "文件已上传到云打印系统；到馆内终端刷校园卡确认打印"}
+	var candidates []map[string]interface{}
 	for attempt := 0; attempt < 3; attempt++ {
 		if attempt > 0 {
 			time.Sleep(300 * time.Millisecond)
@@ -340,16 +366,31 @@ func (s *CloudPrintService) Upload(f *os.File, info os.FileInfo, settings *Cloud
 			result.Warning = "上传 code=0，但任务列表核对失败；请稍后运行 scu cloudprint jobs。不要直接重复上传"
 			return result, nil
 		}
-		result.Jobs = newCloudPrintJobs(before, after, info.Name())
+		candidates = compatibleCloudPrintJobs(newCloudPrintJobs(before, after), fields)
+		result.Jobs = make([]map[string]interface{}, 0)
+		for _, job := range candidates {
+			if job["szJobName"] == info.Name() {
+				result.Jobs = append(result.Jobs, job)
+			}
+		}
 		if len(result.Jobs) == 1 {
 			result.Verification = "matched_new_job"
 			return result, nil
 		}
 		if len(result.Jobs) > 1 {
 			result.Verification = "ambiguous"
-			result.Warning = "观察到多个新增同名任务，请核对 jobs"
+			result.Warning = "上传已确认；观察到多个新增同名任务，请核对 jobs，不要直接重复上传"
 			return result, nil
 		}
+	}
+	if len(candidates) > 0 {
+		result.Jobs = candidates
+		result.Verification = "candidate_new_job"
+		if len(candidates) > 1 {
+			result.Verification = "ambiguous"
+		}
+		result.Warning = "上传已确认；发现新增候选任务，但名称与原文件不同（可能被截断），请按任务 ID 核对 jobs，不要直接重复上传"
+		return result, nil
 	}
 	result.Warning = "上传 code=0，任务尚未出现在列表中；请稍后运行 scu cloudprint jobs。不要直接重复上传"
 	return result, nil
