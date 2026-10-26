@@ -36,3 +36,8 @@ bin/scu
 # .idea/
 # .vscode/
 /scu
+
+# 本地云打印接口调查、抓包和人工验证产物
+/notes/cloudprint/
+/notes/session-logs/2026-10-11-cloudprint.md
+/docs/cloudprint/fixtures/

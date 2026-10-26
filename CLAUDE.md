@@ -49,6 +49,6 @@ cmd/scu → internal/cli（cobra 命令，每命令组一个文件）
 - `internal/api/cloudprint.go` / `internal/cli/cloudprint_cmds.go`：`cloudprint upload <file-path>`（或 `--file`）、`check`、`jobs`/`list`、离线 `--dry-run`。默认 **A4、黑白、长边双面、全部页、1 份**；短边/长边映射分别为 3/2。
 - **云打印文件 POST 不得自动重放**：使用流式 `CookieClient.DoOnce` 和已知 Content-Length，不能改为普通 `Do` 或将整个上传包在 `RetryOnUnauthenticated` 中。认证/读请求可在提交前恢复；提交后的连接异常、307/308、缺失结果码、HTTP 401/403 或回跳 code=4 均返回 `upload_uncertain`，先核对任务，不能返回引导重传的 `unauthenticated`。仅对 301/302/303 跟随受限同源 GET；HTTP 413 明确拒绝仍为 `service`。
 - 云打印选项只在入口处调用 `CloudPrintOptions.Prepare` 校验一次；`CloudPrintSettings` 保存已校验设置，dry-run 读取字段副本，上传复用同一份设置。
-- 云打印中文文件名按浏览器 FormData 使用带引号 UTF-8 `filename=`；真实服务器拒绝 RFC 5987 `filename*=`。任务输出过滤姓名、账号、卡号、服务器文件路径，`szPaperDetail` 二次 JSON 解析；`fee_raw` 单位未确认，上传不代表实际打印或付款。PDF CLI 实测记录见 `notes/cloudprint/2026-10-11/cli-verification.md`。
+- 云打印中文文件名按浏览器 FormData 使用带引号 UTF-8 `filename=`；真实服务器拒绝 RFC 5987 `filename*=`。任务输出过滤姓名、账号、卡号、服务器文件路径，`szPaperDetail` 二次 JSON 解析；`fee_raw` 单位未确认，上传不代表实际打印或付款。接口调查、抓包与人工验证产物仅保留在本地，不纳入提交。
 - 云打印任务核对先比较前后任务 ID，并保留多轮候选并集；Jobs 使用 `json.Number` 保留整数精度。只排除已回传份数/总页数的明确冲突，缺失字段不能证明相符。当前实测未回传 dwFrom/dwTo，显式范围只能用 dwPages 作弱核对，不能证明起止页。名称不一致的新增项只能标为 `candidate_new_job`，不能仅凭前缀或唯一新增 ID 宣称核对成功。`pending`/`candidate_new_job`/`ambiguous` 都不撤销已确认的上传，不得自动重传。
 - npm 分发：`install.js`（postinstall）按平台从 GitHub Release 下载二进制（SHA256 校验）并安装 Skill 到 `~/.claude/skills/scu-cli/`（`SCU_CLI_NO_SKILL=1` 跳过）；`bin/scu.js` 是转发 shim。**package.json 的 version 必须对应已存在的 Release 标签**（CI 发布时用标签值覆盖）。
