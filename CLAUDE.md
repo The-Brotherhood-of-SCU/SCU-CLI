@@ -35,7 +35,6 @@ cmd/scu → internal/cli（cobra 命令，每命令组一个文件）
 - **ScuAuth 是认证单一事实来源**（`internal/auth/scu.go`）：持有持久化凭据（`internal/config`，`credentials.json` 0600 原子写入），token 本地 TTL 1 小时，过期用保存的账号密码 + 验证码 OCR 自动重登。密码用 SM2 加密（`sm2.go`，C1C2C3 原始拼接模式）。
 - **子系统认证（L2）实现 `SubsystemAuth` 接口**（`internal/auth/subsystem.go`）：`ZhjwAuth`（JWT SSO）、`WfwAuth`（CAS 预热，就绪判据是响应为 `e==0` 的 JSON，匿名 200 不算）、`SsoRelayAuth`（缴费/体测/办事大厅/newservice 通用的 SSO 中继，可声明依赖其他子系统先就绪）、`ZhhqAuth`（智慧后勤：SSO 换 tokenKey + 每请求 AES 加密 Token 头，见 `zhhq.go`）、`CcylAuth`（第二课堂独立 OAuth token，与 SCU principal 绑定持久化）。
 - 子系统 client 有缓存，**根 client 身份变化时缓存自动作废**；`RetryOnUnauthenticated` 是统一恢复边界——认证失效时 invalidate + 重建 session，业务请求只重放一次。
-- **云打印认证**（`internal/auth/cloudprint.go`）：`SSoPage` 返回 JSON 登录链接，需解析 `result`，用根 cookie jar 跟随 libic/CAS 回跳，最后以 `Auth/Check code=0` 且非空 `SessionId` 验证就绪。逐跳校验打印 IP、libic 和统一认证的允许 origin；SCU Bearer 与密码不能发送到 HTTP 打印 IP。
 - **CookieClient 的铁律**（`internal/auth/cookie_client.go`）：重定向必须手动逐跳跟随，重定向策略必须返回 `http.ErrUseLastResponse`（不能用 `resty.NoRedirectPolicy()`，否则 3xx 被包装成 `*url.Error` 上抛）；跨源跳转剥离 `Authorization`/`Cookie` 等敏感 header，除非 `AllowSensitiveOrigin` 显式允许。教务 `zhjw.scu.edu.cn` 仅支持 HTTP。
 - 错误分类在 `internal/auth/errors.go`：`UnauthenticatedError`（触发重试）、`ServiceError`（不重试）、`LoginError`（`InvalidCaptcha` 时换验证码重试）、`CcylAuthExpiredError`（CCYL 边界重试一次）。
 
@@ -44,8 +43,5 @@ cmd/scu → internal/cli（cobra 命令，每命令组一个文件）
 - `internal/ocr`：验证码本地 OCR，`//go:embed model_centroid.json` 质心模型，49 维特征（48 维 8×6 二值像素 + 宽高比）。登录流程：OCR 失败换新验证码重试（最多 5 次），非 TTY 下 OCR 失败直接报错而非阻塞。
 - `internal/config`：除凭据外还存电费余额趋势快照（`balance_history.json`，按房间归集保留 365 天）。配置目录可被 `SCU_CLI_CONFIG_DIR` 覆盖——**测试必须用 `t.Setenv("SCU_CLI_CONFIG_DIR", t.TempDir())` 隔离**，避免碰真实凭据。
 - `internal/ics`：ICS 日历导出，校区节次时段表自动探测（`campus.go`）。
-- `internal/api/cloudprint.go` / `internal/cli/cloudprint_cmds.go`：`cloudprint upload <file-path>`（或 `--file`）、`check`、`jobs`/`list`、离线 `--dry-run`。默认 **A4、黑白、长边双面、全部页、1 份**；短边/长边映射分别为 3/2。
-- **云打印文件 POST 不得自动重放**：使用流式 `CookieClient.DoOnce` 和已知 Content-Length，不能改为普通 `Do` 或将整个上传包在 `RetryOnUnauthenticated` 中。认证/读请求可在提交前恢复；提交后的连接异常、307/308、缺失结果码、HTTP 401/403 或回跳 code=4 均返回 `upload_uncertain`，先核对任务，不能返回引导重传的 `unauthenticated`。仅对 301/302/303 跟随受限同源 GET；HTTP 413 明确拒绝仍为 `service`。
-- 云打印选项只在入口处调用 `CloudPrintOptions.Prepare` 校验一次；`CloudPrintSettings` 保存已校验设置，dry-run 读取字段副本，上传复用同一份设置。
-- 云打印中文文件名按浏览器 FormData 使用带引号 UTF-8 `filename=`；真实服务器拒绝 RFC 5987 `filename*=`。任务输出过滤姓名、账号、卡号、服务器文件路径，`szPaperDetail` 二次 JSON 解析；`fee_raw` 单位未确认，上传不代表实际打印或付款。接口调查、抓包与人工验证产物仅保留在本地，不纳入提交。
+- 云打印代码见 `internal/api/cloudprint.go`、`internal/auth/cloudprint.go`。文件上传必须使用 `CookieClient.DoOnce`；提交后结果不确定时先查任务，禁止自动重传。
 - npm 分发：`install.js`（postinstall）按平台从 GitHub Release 下载二进制（SHA256 校验）并安装 Skill 到 `~/.claude/skills/scu-cli/`（`SCU_CLI_NO_SKILL=1` 跳过）；`bin/scu.js` 是转发 shim。**package.json 的 version 必须对应已存在的 Release 标签**（CI 发布时用标签值覆盖）。

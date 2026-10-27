@@ -313,21 +313,17 @@ MAC 为 12 位十六进制、无分隔符、大写（如 B8782EBDCE85）；冒�
 ## 13. 图书馆云打印 `scu cloudprint`
 
 ```bash
-scu cloudprint check           # 验证 SCU → libic/CAS → 打印系统会话
+scu cloudprint check
 scu cloudprint upload './document.pdf'
-scu cloudprint upload --file './document.pdf' --color color --paper a3 --duplex long-edge --copies 2 --pages 2-3
-scu cloudprint upload './document.pdf' --duplex short-edge --pages 4 --dry-run
-scu cloudprint jobs            # list 为别名
+scu cloudprint upload './document.pdf' --color color --paper a3 --duplex short-edge --copies 2 --pages 2-3
+scu cloudprint upload './document.pdf' --dry-run
+scu cloudprint jobs
 ```
 
-- 默认 `--color bw --paper a4 --duplex long-edge --copies 1 --pages all`（A4 黑白长边双面）。颜色为 `bw/color`，纸型为 `a4/a3/original`，单双面为 `simplex/long-edge/short-edge`；页范围为 `all`、单页或连续区间。
-- 文件路径可用位置参数或 `--file`，不能同时提供。WSL 可用 `/mnt/c/...`，也会将引号包裹的 `C:\...` 转成挂载路径。路径含空格时加引号。
-- `--dry-run` 只验证本地文件并返回 protocol fields，不要求登录。非空普通文件及格式后缀先做本地检查，格式转换由服务器负责；大文件可设置 `SCU_CLI_TIMEOUT=120`。
-- 使用 `scu login` 的已有凭据；不另存图书馆密码或输出 SessionId。上传只创建云打印任务，实际打印由用户在馆内刷卡确认。
-- 按用户已授权的文件与设置执行上传；已有明确授权时无需重复确认。
-- 上传 POST 永不自动重放。文件提交后的 HTTP 401/403、回跳 `code=4` 等认证错误统一返回 `upload_uncertain`，表示可能已生成任务；先用 `jobs` 核对，不能仅重新登录后直接重传。文件提交前的认证失败仍为 `unauthenticated`，HTTP 413 明确拒绝文件仍为 `service`。
-- 成功输出 `status=uploaded`、`verification`、`jobs`；`matched_new_job` 为一个新增同名任务，`pending`/`ambiguous` 查看 `warning`。`jobs` 的 `szPaperDetail` 已解析；页数和纸张数为每份，`dwCopies` 另计。
-- `fee_raw` 单位未确认，不能解释成已扣费。打印接口使用 HTTP。
+- 默认 A4、黑白、长边双面、全部页、1 份；参数可选值见 `scu cloudprint upload --help`。文件路径也可用 `--file`；WSL 支持 `/mnt/c/...` 和引号包裹的 `C:\...`。
+- 使用已有 SCU 登录；`--dry-run` 可离线检查文件和设置。按用户已授权的文件与设置执行，无需重复确认。
+- 上传只创建待打印任务，实际打印由用户到馆内确认。接口使用 HTTP，`fee_raw` 不代表已扣费。
+- 返回 `upload_uncertain` 时先查 `jobs`，不得自动重传。`status=uploaded` 表示已接受上传；任务核对未完成时按 `warning` 查看 `jobs`，同样不能据此重传。任务核对不证明打印设置逐项相符。
 
 ## 14. 行为准则
 
