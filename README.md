@@ -29,7 +29,7 @@ go install github.com/The-Brotherhood-of-SCU/SCU-CLI/cmd/scu@latest
 ```bash
 scu login -u 2023xxxxxx -p '密码'   # 验证码由内置本地 OCR 自动识别；省略 -p 则交互输入（不回显）
 scu zhjw schedule --plan 2025-2026-2-1
-scu cloudprint upload '/mnt/c/Users/ykx20/Documents/document.pdf' --duplex long-edge --copies 2 --pages 2-3
+scu cloudprint upload './document.pdf'
 ```
 
 凭据保存于用户配置目录的 `credentials.json`（0600 权限），会话过期自动重新登录。非 TTY 环境下需要交互输入时会立即报错而非阻塞。
@@ -143,7 +143,7 @@ scu cloudprint upload './document.pdf' --duplex short-edge --pages 4 --dry-run
 scu cloudprint jobs
 ```
 
-上传复用现有 SCU 登录，经图书馆 libic/CAS 建立云打印会话。默认黑白 `bw`、A4 `a4`、长边双面 `long-edge`、全部页 `all`、1 份。
+复用 `scu login` 的登录信息，默认 A4、黑白、长边双面、全部页、1 份。
 
 | 参数 | 可选值 |
 |---|---|
@@ -155,9 +155,11 @@ scu cloudprint jobs
 | `--pages` | `all`、单页编号或连续范围，如 `2-3` |
 | `--dry-run` | 只检查本地文件并输出参数，不登录、不上传 |
 
-支持网页允许的 PDF、图片、TXT、Office 等文件后缀；具体格式能否转换由打印服务器决定。`jobs`/`list` 返回打印所需的后端任务字段，省略账号、姓名、卡号和服务器文件路径；`szPaperDetail` JSON 字符串自动解析为数组。上传输出 `status=uploaded`、`verification` 和任务 `jobs`。先按任务 ID 找新增项，再用已回传的份数排除冲突；显式页范围只比较 `dwPages == 结束页-起始页+1` 作弱核对。**当前实测未见服务端回传 `dwFrom/dwTo`，总页数相同也不能证明起止页相同；字段缺失时保留候选，不能作为设置相符的证据。** `matched_new_job` 表示发现一个新增同名任务；名称被截断或改写时，以 `candidate_new_job` 返回待核对候选及任务 ID，不能视为确定匹配。`pending` 表示暂未找到相符任务，`ambiguous` 表示存在多个匹配或候选；多轮观察到的候选按 ID 保留并集。**这些核对状态不会撤销服务器已确认的上传，均不能据此直接重复上传**，请按 `warning` 查看 `jobs`。任务 ID 作为 JSON 整数保留，不经 float64 转换；`fee_raw` 原样保留服务器回跳参数，其单位未确认。
+支持 PDF、图片、TXT、Office 等格式，能否转换由打印服务器决定。上传只创建待打印任务，实际打印需到馆内终端刷卡确认。大文件可用 `SCU_CLI_TIMEOUT=120` 延长超时。
 
-上传生成待打印任务，实际打印在馆内终端刷校园卡确认。服务为 HTTP。文件采用流式 multipart 和 Content-Length；上传 POST 不自动重放。文件提交后的超时、异常回跳、缺失结果码，以及 HTTP 401/403 或回跳 `code=4`，均返回 `upload_uncertain`；先运行 `scu cloudprint jobs` 核对，不能仅重新登录后直接重传。文件提交前的认证失败仍返回 `unauthenticated`，HTTP 413 明确拒绝文件仍返回 `service`。大文件可设置 `SCU_CLI_TIMEOUT=120` 等延长单次请求超时。
+`status=uploaded` 表示服务器已接受上传，任务核对情况见 `verification` 和 `warning`。核对不代表打印设置已逐项验证；`fee_raw` 也不代表已扣费。
+
+打印服务使用 HTTP。上传不会自动重发；返回 `upload_uncertain` 或核对未完成时，先用 `scu cloudprint jobs` 查看任务，避免重复上传。
 
 ## 许可证
 
