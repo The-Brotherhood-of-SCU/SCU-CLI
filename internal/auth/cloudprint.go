@@ -11,8 +11,8 @@ const CloudPrintBase = "http://202.115.54.240"
 const CloudPrintPage = "/client/new/cprintPc/cprint.html"
 const CloudPrintJobsPage = "/client/new/cprintPc/printDoc.html"
 
-// CloudPrintEnvelope is the print system's JSON envelope, not the CLI envelope.
-// A missing code must never be mistaken for code=0.
+// CloudPrintEnvelope 是打印服务的 JSON 包层，与 CLI 输出包层不同。
+// code 缺失时不能将其误认为成功的 code=0。
 type CloudPrintEnvelope struct {
 	Code      *int            `json:"code"`
 	Message   string          `json:"message"`
@@ -63,8 +63,8 @@ func CheckCloudPrint(client *CookieClient, base string) error {
 
 type cloudPrintRoot interface{ GetClient() (*CookieClient, error) }
 
-// CloudPrintAuth follows the JSON SSoPage login link through libic/CAS using
-// the root cookie jar. Neither SCU tokens nor passwords are sent to the print IP.
+// CloudPrintAuth 解析 SSoPage 的 JSON 登录链接，用根 cookie jar 完成 libic/CAS 回跳。
+// SCU token 与密码都不能发送到打印 IP。
 type CloudPrintAuth struct {
 	scu        cloudPrintRoot
 	base       string
@@ -74,6 +74,7 @@ type CloudPrintAuth struct {
 	ready      bool
 }
 
+// cloudPrintOriginAllowed 限定打印站、图书馆中继和统一认证的跳转来源。
 func cloudPrintOriginAllowed(u *url.URL) bool {
 	if u.User != nil || u.Fragment != "" {
 		return false
@@ -101,7 +102,7 @@ func (a *CloudPrintAuth) GetClient() (*CookieClient, error) {
 	if a.ready {
 		return client, nil
 	}
-	// Auth/Check also creates the anonymous session used by SSoPage.
+	// Auth/Check 也会创建后续 SSoPage 使用的匿名会话。
 	if err = CheckCloudPrint(client, a.base); err == nil {
 		a.ready = true
 		return client, nil

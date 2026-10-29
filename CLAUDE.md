@@ -15,6 +15,8 @@ go test ./internal/api/ -run TestCalculateBalanceTrend   # 单个测试
 go vet ./...                # 无 lint 配置，vet 即可
 ```
 
+`.github/workflows/test.yml` 在 PR 与 main 分支 push 时自动运行 `go vet ./...` 和 `go test ./...`，Go 版本读取 `go.mod`。发布工作流仍仅由版本标签触发。
+
 发布不手动执行：推送 `vX.Y.Z` 标签触发 `.github/workflows/release.yml`，构建 6 平台二进制（`-ldflags -X .../internal/cli.Version=<tag>` 注入版本）→ GitHub Release → npm（OIDC Trusted Publishing）→ SkillHub。**CI 会从 CHANGELOG.md 提取 `## [X.Y.Z]` 章节作为 Release 说明，缺失该章节则发布失败**——发版前必须先写 CHANGELOG。
 
 ## 输出契约（所有命令必须遵守）

@@ -27,7 +27,12 @@ func (a *cloudPrintTestAuth) Invalidate()                            { a.invalid
 
 func cloudPrintFixture(t *testing.T) (*os.File, os.FileInfo) {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "测试 document.pdf")
+	return cloudPrintNamedFixture(t, "测试 document.pdf")
+}
+
+func cloudPrintNamedFixture(t *testing.T, name string) (*os.File, os.FileInfo) {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), name)
 	if err := os.WriteFile(path, []byte("%PDF-1.4\nfixture document\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +149,7 @@ func TestCloudPrintUploadStreamsCorrectFormAndMatchesNewJob(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if posts.Load() != 1 || result.FeeRaw != "40" || result.Verification != "matched_new_job" || len(result.Jobs) != 1 || result.Jobs[0]["dwJobId"] != float64(101) {
+	if posts.Load() != 1 || result.FeeRaw != "40" || result.Verification != "matched_new_job" || len(result.Jobs) != 1 || result.Jobs[0]["dwJobId"] != json.Number("101") {
 		t.Fatalf("result=%+v, posts=%d", result, posts.Load())
 	}
 	if _, ok := result.Jobs[0]["szPaperDetail"].([]interface{}); !ok {
@@ -168,7 +173,7 @@ func TestCloudPrintUploadNeverReplaysAmbiguousOrRejectedPOST(t *testing.T) {
 					fmt.Fprint(w, `{"code":0,"SessionId":"session"}`)
 				case "/api/client/PrintJob/Get":
 					if posts.Load() > 0 {
-						json.NewEncoder(w).Encode(map[string]interface{}{"code": 0, "result": []map[string]interface{}{{"dwJobId": 7, "szJobName": info.Name()}}})
+						json.NewEncoder(w).Encode(map[string]interface{}{"code": 0, "result": []map[string]interface{}{{"dwJobId": 1390900, "szJobName": info.Name()}}})
 					} else {
 						fmt.Fprint(w, `{"code":0,"result":[]}`)
 					}
@@ -232,7 +237,7 @@ func TestCloudPrintUploadNeverReplaysAmbiguousOrRejectedPOST(t *testing.T) {
 					t.Fatalf("413 明确拒绝应返回 service: %v", err)
 				}
 			}
-			if mode == "connection-lost" && !strings.Contains(err.Error(), "ID=7") {
+			if mode == "connection-lost" && !strings.Contains(err.Error(), "ID=1390900") {
 				t.Fatalf("missing reconciliation: %v", err)
 			}
 		})
@@ -246,5 +251,145 @@ func TestCloudPrintUploadRejectsUnpreparedSettingsBeforeAuth(t *testing.T) {
 		if _, err := s.Upload(f, info, settings); err == nil {
 			t.Fatal("未校验设置不应触发认证或上传")
 		}
+	}
+}
+
+func TestCloudPrintVerificationUsesIDsAndKeepsRenamedJobsAsCandidates(t *testing.T) {
+	name := strings.Repeat("long-document-", 12) + ".pdf"
+	newJob := func(id int, remoteName string, copies int, pages interface{}) map[string]interface{} {
+		job := map[string]interface{}{"dwJobId": id, "szJobName": remoteName, "dwCopies": copies}
+		if pages != nil {
+			job["dwPages"] = pages
+		}
+		return job
+	}
+	for _, tc := range []struct {
+		name         string
+		jobs         []map[string]interface{}
+		verification string
+		count        int
+		pages        string
+	}{
+		{"truncated", []map[string]interface{}{newJob(101, "long-document-long-doc.pdf", 2, 2)}, "candidate_new_job", 1, "2-3"},
+		{"actual-response-no-range-fields", []map[string]interface{}{newJob(101, "converted.pdf", 2, 2)}, "candidate_new_job", 1, "2-3"},
+		{"missing-settings", []map[string]interface{}{{"dwJobId": 101, "szJobName": "long-document.pdf"}}, "candidate_new_job", 1, "2-3"},
+		{"conflicting-copies", []map[string]interface{}{newJob(101, name, 3, 2)}, "pending", 0, "2-3"},
+		{"conflicting-page-count", []map[string]interface{}{newJob(101, name, 2, 3)}, "pending", 0, "2-3"},
+		{"existing-id", []map[string]interface{}{newJob(100, name, 2, 2)}, "pending", 0, "2-3"},
+		{"multiple-candidates", []map[string]interface{}{newJob(101, "converted.pdf", 2, 2), newJob(102, "another.pdf", 2, 2)}, "ambiguous", 2, "2-3"},
+		{"exact-name-with-other-job", []map[string]interface{}{newJob(101, name, 2, 2), newJob(102, "another.pdf", 3, 2)}, "matched_new_job", 1, "2-3"},
+		{"duplicate-row", []map[string]interface{}{newJob(101, name, 2, 2), newJob(101, name, 2, 2)}, "matched_new_job", 1, "2-3"},
+		{"all-pages-normalized", []map[string]interface{}{newJob(101, name, 2, 20)}, "matched_new_job", 1, "all"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("SCU_CLI_CONFIG_DIR", t.TempDir())
+			f, info := cloudPrintNamedFixture(t, name)
+			var posts atomic.Int32
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/api/client/Auth/Check":
+					fmt.Fprint(w, `{"code":0,"SessionId":"session"}`)
+				case "/api/client/PrintJob/Get":
+					jobs := []map[string]interface{}{newJob(100, name, 2, 2)}
+					if posts.Load() > 0 {
+						jobs = append(jobs, tc.jobs...)
+					}
+					json.NewEncoder(w).Encode(map[string]interface{}{"code": 0, "result": jobs})
+				case "/api/client/CloudPrint/Upload":
+					posts.Add(1)
+					io.Copy(io.Discard, r.Body)
+					http.Redirect(w, r, auth.CloudPrintJobsPage+"?code=0", 303)
+				case auth.CloudPrintJobsPage:
+					fmt.Fprint(w, "print page")
+				default:
+					t.Errorf("unexpected path %s", r.URL.Path)
+				}
+			}))
+			defer srv.Close()
+			c, err := auth.NewCookieClient()
+			if err != nil {
+				t.Fatal(err)
+			}
+			s := &CloudPrintService{auth: &cloudPrintTestAuth{client: c}, base: srv.URL}
+			settings := prepareCloudPrintSettings(t, CloudPrintOptions{Color: "bw", Paper: "a4", Duplex: "long-edge", Copies: 2, Pages: tc.pages})
+			result, err := s.Upload(f, info, settings)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result.Status != "uploaded" || result.Verification != tc.verification || len(result.Jobs) != tc.count || posts.Load() != 1 {
+				t.Fatalf("result=%+v posts=%d", result, posts.Load())
+			}
+			if tc.verification != "matched_new_job" && !strings.Contains(result.Warning, "不要直接重复上传") {
+				t.Fatalf("missing no-replay guidance: %+v", result)
+			}
+		})
+	}
+}
+
+func TestCloudPrintCandidatesSurviveLaterEmptyOrFailedReads(t *testing.T) {
+	for _, mode := range []string{"empty-last", "error-last", "different-candidate"} {
+		t.Run(mode, func(t *testing.T) {
+			t.Setenv("SCU_CLI_CONFIG_DIR", t.TempDir())
+			f, info := cloudPrintFixture(t)
+			var posts, reads atomic.Int32
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/api/client/Auth/Check":
+					fmt.Fprint(w, `{"code":0,"SessionId":"session"}`)
+				case "/api/client/PrintJob/Get":
+					jobs := []map[string]interface{}{}
+					if posts.Load() > 0 {
+						read := reads.Add(1)
+						if read == 1 {
+							jobs = append(jobs, map[string]interface{}{"dwJobId": json.Number("9007199254740993"), "szJobName": "converted.pdf", "dwCopies": 1, "dwPages": 2})
+						}
+						if read == 2 && mode == "error-last" {
+							w.WriteHeader(503)
+							return
+						}
+						if read == 2 && mode == "different-candidate" {
+							jobs = append(jobs, map[string]interface{}{"dwJobId": 1390900, "szJobName": "converted-2.pdf", "dwCopies": 1, "dwPages": 2})
+						}
+					}
+					json.NewEncoder(w).Encode(map[string]interface{}{"code": 0, "result": jobs})
+				case "/api/client/CloudPrint/Upload":
+					posts.Add(1)
+					io.Copy(io.Discard, r.Body)
+					http.Redirect(w, r, auth.CloudPrintJobsPage+"?code=0", 303)
+				case auth.CloudPrintJobsPage:
+					fmt.Fprint(w, "print page")
+				}
+			}))
+			defer srv.Close()
+			client, err := auth.NewCookieClient()
+			if err != nil {
+				t.Fatal(err)
+			}
+			service := &CloudPrintService{auth: &cloudPrintTestAuth{client: client}, base: srv.URL}
+			result, err := service.Upload(f, info, prepareCloudPrintSettings(t, CloudPrintOptions{Color: "bw", Paper: "a4", Duplex: "long-edge", Copies: 1, Pages: "2-3"}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			want, count := "candidate_new_job", 1
+			if mode == "different-candidate" {
+				want, count = "ambiguous", 2
+			}
+			if result.Status != "uploaded" || result.Verification != want || len(result.Jobs) != count || posts.Load() != 1 {
+				t.Fatalf("result=%+v posts=%d", result, posts.Load())
+			}
+			if result.Jobs[0]["dwJobId"] != json.Number("9007199254740993") {
+				t.Fatalf("ID precision lost: %+v", result.Jobs)
+			}
+			encoded, err := json.Marshal(result.Jobs)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(encoded), `"dwJobId":9007199254740993`) {
+				t.Fatalf("ID must remain a JSON integer: %s", encoded)
+			}
+		})
+	}
+	if got := cloudPrintJobID(float64(1390900)); got != "1390900" {
+		t.Fatalf("scientific notation leaked: %q", got)
 	}
 }
