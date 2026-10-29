@@ -7,7 +7,6 @@ import (
 
 	"github.com/The-Brotherhood-of-SCU/SCU-CLI/internal/api"
 	"github.com/The-Brotherhood-of-SCU/SCU-CLI/internal/auth"
-	"github.com/The-Brotherhood-of-SCU/SCU-CLI/internal/config"
 	"github.com/The-Brotherhood-of-SCU/SCU-CLI/internal/ics"
 	"github.com/The-Brotherhood-of-SCU/SCU-CLI/internal/output"
 	"github.com/spf13/cobra"
@@ -20,20 +19,6 @@ func runJSON(fn func() (interface{}, error)) error {
 		return output.Fail(errorKind(err), err)
 	}
 	return output.JSON(data)
-}
-
-// errorKind 按错误类型给出机器可读分类。
-func errorKind(err error) string {
-	switch {
-	case auth.IsUnauthenticated(err):
-		return "unauthenticated"
-	case config.IsConfigError(err):
-		// 凭据读写/解析失败是本地配置问题，不能归为 service——
-		// 那会误导调用方按网络/服务端故障处理。
-		return "config"
-	default:
-		return "service"
-	}
 }
 
 func newZhjwService() (*api.ZhjwService, error) {

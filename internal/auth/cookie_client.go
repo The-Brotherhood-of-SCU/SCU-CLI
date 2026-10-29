@@ -156,6 +156,39 @@ func (c *CookieClient) doOnce(method, rawURL string, headers map[string]string, 
 	}, nil
 }
 
+// DoOnce streams a request with a known Content-Length and never replays it.
+// Use for non-idempotent uploads: a transport failure may occur after acceptance.
+func (c *CookieClient) DoOnce(method, rawURL string, headers map[string]string, body io.Reader, contentLength int64) (*Response, error) {
+	c.mu.Lock()
+	transport := c.rc.GetClient().Transport
+	c.mu.Unlock()
+	hc := &http.Client{
+		Transport: transport, Jar: c.jar, Timeout: requestTimeout(),
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
+	req, err := http.NewRequest(method, rawURL, body)
+	if err != nil {
+		return nil, err
+	}
+	req.ContentLength = contentLength
+	// Disable net/http's optional body replay as well as the Resty recovery path.
+	req.GetBody = nil
+	req.Header.Set("User-Agent", DefaultUserAgent)
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	resp, err := hc.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	return &Response{StatusCode: resp.StatusCode, Header: resp.Header, Body: data, URL: resp.Request.URL}, nil
+}
+
 // Get 执行单次 GET。
 func (c *CookieClient) Get(rawURL string, headers map[string]string) (*Response, error) {
 	return c.Do(http.MethodGet, rawURL, headers, nil)
@@ -174,13 +207,29 @@ func (c *CookieClient) PostForm(rawURL string, headers map[string]string, form u
 // 每一跳由 net/http cookiejar 自动收集 Set-Cookie、按域携带 Cookie；
 // 跨源跳转剥离敏感 header（除非该 origin 被显式允许）。
 func (c *CookieClient) FollowRedirects(rawURL string, headers map[string]string) (*Response, error) {
+	return c.followRedirects(rawURL, headers, nil)
+}
+
+// FollowRedirectsAllowed validates the initial URL and every redirect before
+// sending a request. Rejected URLs are deliberately omitted from error messages.
+func (c *CookieClient) FollowRedirectsAllowed(rawURL string, headers map[string]string, allowed func(*url.URL) bool) (*Response, error) {
+	return c.followRedirects(rawURL, headers, allowed)
+}
+
+func (c *CookieClient) followRedirects(rawURL string, headers map[string]string, allowed func(*url.URL) bool) (*Response, error) {
 	current := rawURL
 	currentHeaders := headers
 	prevOrigin := ""
 	for hop := 0; hop < maxRedirects; hop++ {
 		u, err := url.Parse(current)
 		if err != nil {
+			if allowed != nil {
+				return nil, &ServiceError{Msg: "认证重定向 URL 非法"}
+			}
 			return nil, &ServiceError{Msg: fmt.Sprintf("重定向 URL 非法: %v", err)}
+		}
+		if allowed != nil && !allowed(u) {
+			return nil, &ServiceError{Msg: "认证重定向目标不在允许的服务列表中"}
 		}
 		origin := u.Scheme + "://" + u.Host
 		if prevOrigin != "" && origin != prevOrigin {
@@ -193,6 +242,9 @@ func (c *CookieClient) FollowRedirects(rawURL string, headers map[string]string)
 		}
 		resp, err := c.Get(current, currentHeaders)
 		if err != nil {
+			if allowed != nil {
+				return nil, &ServiceError{Msg: "认证跳转请求失败（网络或超时）"}
+			}
 			return nil, err
 		}
 		if !isRedirect(resp.StatusCode) {
@@ -200,6 +252,9 @@ func (c *CookieClient) FollowRedirects(rawURL string, headers map[string]string)
 		}
 		loc := resp.Header.Get("Location")
 		if loc == "" {
+			if allowed != nil {
+				return nil, &ServiceError{Msg: "认证重定向缺少 Location"}
+			}
 			return nil, &ServiceError{Msg: fmt.Sprintf("重定向缺失 Location (HTTP %d, %s)", resp.StatusCode, current)}
 		}
 		// 服务端 bug 容错：统一认证跳教务的 Location 含字面空格
@@ -209,10 +264,16 @@ func (c *CookieClient) FollowRedirects(rawURL string, headers map[string]string)
 		loc = strings.ReplaceAll(loc, " ", "%20")
 		next, err := u.Parse(loc)
 		if err != nil {
+			if allowed != nil {
+				return nil, &ServiceError{Msg: "认证重定向 Location 非法"}
+			}
 			return nil, &ServiceError{Msg: fmt.Sprintf("重定向 Location 非法: %q", loc)}
 		}
 		prevOrigin = origin
 		current = next.String()
+	}
+	if allowed != nil {
+		return nil, &ServiceError{Msg: "认证重定向次数超过限制"}
 	}
 	return nil, &ServiceError{Msg: fmt.Sprintf("重定向超过 %d 跳: %s", maxRedirects, rawURL)}
 }

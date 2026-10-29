@@ -29,6 +29,7 @@ go install github.com/The-Brotherhood-of-SCU/SCU-CLI/cmd/scu@latest
 ```bash
 scu login -u 2023xxxxxx -p '密码'   # 验证码由内置本地 OCR 自动识别；省略 -p 则交互输入（不回显）
 scu zhjw schedule --plan 2025-2026-2-1
+scu cloudprint upload './document.pdf'
 ```
 
 凭据保存于用户配置目录的 `credentials.json`（0600 权限），会话过期自动重新登录。非 TTY 环境下需要交互输入时会立即报错而非阻塞。
@@ -42,7 +43,7 @@ stdout 恒为单个 JSON 对象，诊断信息走 stderr：
 {"ok": false, "error": {"kind": "unauthenticated", "message": "..."}}
 ```
 
-失败时退出码非 0。`error.kind`：`unauthenticated`（重新 `scu login`）、`login`（登录阶段错误）、`captcha`（验证码获取/识别失败）、`logout`（清除凭据失败）、`service`（服务端/网络错误）、`config`（本地配置/凭据错误）、`input`（本地输入错误）。
+失败时退出码非 0。`error.kind`：`unauthenticated`（重新 `scu login`）、`login`（登录阶段错误）、`captcha`（验证码获取/识别失败）、`logout`（清除凭据失败）、`service`（服务端/网络错误）、`config`（本地配置/凭据错误）、`input`（本地输入错误）、`upload_uncertain`（云打印可能已收到文件，先查任务，禁止直接重试）。
 
 环境变量：`SCU_CLI_CONFIG_DIR` 覆盖配置目录；`SCU_CLI_TIMEOUT` 覆盖单次 HTTP 请求超时秒数（默认 30，防止校园网不通时挂起）；`SCU_CLI_COMPACT=1` 输出单行紧凑 JSON（面向 AI/脚本，省 token）。
 
@@ -131,6 +132,34 @@ stdout 恒为单个 JSON 对象，诊断信息走 stderr：
 | `devices` / `user` | 已绑定无感设备列表 / 校园网账户信息 |
 | `add --mac <MAC> [--days N] [--exit 运营商]` | 绑定设备 MAC（12 位十六进制无分隔符，冒号/连字符写法自动归一化；绑定后连校园网自动认证；`--days 0` 为最长 6 年） |
 | `cancel --mac <MAC>` | 取消指定设备的无感认证 |
+
+### 图书馆云打印 `scu cloudprint`
+
+```bash
+scu cloudprint check
+scu cloudprint upload './document.pdf'
+scu cloudprint upload --file './document.pdf' --color color --paper a3 --duplex long-edge --copies 2 --pages 2-3
+scu cloudprint upload './document.pdf' --duplex short-edge --pages 4 --dry-run
+scu cloudprint jobs
+```
+
+复用 `scu login` 的登录信息，默认 A4、黑白、长边双面、全部页、1 份。
+
+| 参数 | 可选值 |
+|---|---|
+| 文件路径 | 位置参数或 `--file`；WSL 支持 `/mnt/c/...` 和引号包裹的 `C:\...` |
+| `--color` | `bw` / `color` |
+| `--paper` | `a4` / `a3` / `original`（原文档纸型） |
+| `--duplex` | `simplex` / `long-edge` / `short-edge` |
+| `--copies` | 正整数 |
+| `--pages` | `all`、单页编号或连续范围，如 `2-3` |
+| `--dry-run` | 只检查本地文件并输出参数，不登录、不上传 |
+
+支持 PDF、图片、TXT、Office 等格式，能否转换由打印服务器决定。上传只创建待打印任务，实际打印需到馆内终端刷卡确认。大文件可用 `SCU_CLI_TIMEOUT=120` 延长超时。
+
+`status=uploaded` 表示服务器已接受上传，任务核对情况见 `verification` 和 `warning`。核对不代表打印设置已逐项验证；`fee_raw` 也不代表已扣费。
+
+打印服务使用 HTTP。上传不会自动重发；返回 `upload_uncertain` 或核对未完成时，先用 `scu cloudprint jobs` 查看任务，避免重复上传。
 
 ## 许可证
 
